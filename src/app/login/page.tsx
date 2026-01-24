@@ -7,8 +7,8 @@ import axios from 'axios';
 
 export default function LoginPage() {
     const router = useRouter();
-    const [username, setUsername] = React.useState('ITS181');
-    const [password, setPassword] = React.useState('TrcrLeTxfW');
+    const [username, setUsername] = React.useState('');
+    const [password, setPassword] = React.useState('');
     const [error, setError] = React.useState('');
     const [loading, setLoading] = React.useState(false);
 
