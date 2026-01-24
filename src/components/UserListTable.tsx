@@ -195,7 +195,7 @@ export default function UserListTable() {
                     disabled={selected.length === 0}
                     onClick={() => setIsDialogOpen(true)}
                 >
-                    Add Follow Up ({selected.length})
+                    Add Follow Up (<span className="notranslate">{selected.length}</span>)
                 </Button>
             </Box>
 
