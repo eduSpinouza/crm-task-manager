@@ -12,15 +12,21 @@ import IconButton from '@mui/material/IconButton';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
 
 export default function TokenSettings() {
     const [open, setOpen] = React.useState(false);
+    const [tabIndex, setTabIndex] = React.useState(0);
     const [token, setToken] = React.useState('');
+    const [emailSender, setEmailSender] = React.useState('');
+    const [emailPassword, setEmailPassword] = React.useState('');
 
     const handleClickOpen = () => {
-        // Load existing token
-        const savedToken = localStorage.getItem('external_api_token') || '';
-        setToken(savedToken);
+        // Load existing settings
+        setToken(localStorage.getItem('external_api_token') || '');
+        setEmailSender(localStorage.getItem('email_sender') || '');
+        setEmailPassword(localStorage.getItem('email_app_password') || '');
         setOpen(true);
     };
 
@@ -30,6 +36,8 @@ export default function TokenSettings() {
 
     const handleSave = () => {
         localStorage.setItem('external_api_token', token);
+        localStorage.setItem('email_sender', emailSender);
+        localStorage.setItem('email_app_password', emailPassword);
         // Reload page to apply changes immediately
         window.location.reload();
     };
@@ -43,35 +51,73 @@ export default function TokenSettings() {
                 color="inherit"
                 sx={{ ml: 2 }}
             >
-                API Token
+                Settings
             </Button>
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-                <DialogTitle>External API Configuration</DialogTitle>
+                <DialogTitle>Configuration</DialogTitle>
                 <DialogContent>
-                    <DialogContentText>
-                        Please paste the Bearer Token from the external CRM. This is required to fetch data.
-                    </DialogContentText>
-                    <TextField
-                        autoFocus
-                        margin="dense"
-                        id="token"
-                        label="Bearer Token"
-                        type="text"
-                        fullWidth
-                        variant="outlined"
-                        value={token}
-                        onChange={(e) => setToken(e.target.value)}
-                        multiline
-                        rows={4}
-                    />
+                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 2 }}>
+                        <Tab label="API Token" />
+                        <Tab label="Email" />
+                    </Tabs>
+
+                    {tabIndex === 0 && (
+                        <Box>
+                            <DialogContentText sx={{ mb: 2 }}>
+                                Paste the Bearer Token from the external CRM. Required to fetch data.
+                            </DialogContentText>
+                            <TextField
+                                autoFocus
+                                margin="dense"
+                                label="Bearer Token"
+                                type="text"
+                                fullWidth
+                                variant="outlined"
+                                value={token}
+                                onChange={(e) => setToken(e.target.value)}
+                                multiline
+                                rows={4}
+                            />
+                        </Box>
+                    )}
+
+                    {tabIndex === 1 && (
+                        <Box>
+                            <DialogContentText sx={{ mb: 2 }}>
+                                Configure Gmail SMTP for sending emails. You need a Gmail account with an App Password.
+                            </DialogContentText>
+                            <TextField
+                                margin="dense"
+                                label="Sender Email (Gmail)"
+                                type="email"
+                                fullWidth
+                                variant="outlined"
+                                value={emailSender}
+                                onChange={(e) => setEmailSender(e.target.value)}
+                                placeholder="your-email@gmail.com"
+                            />
+                            <TextField
+                                margin="dense"
+                                label="App Password"
+                                type="password"
+                                fullWidth
+                                variant="outlined"
+                                value={emailPassword}
+                                onChange={(e) => setEmailPassword(e.target.value)}
+                                placeholder="xxxx xxxx xxxx xxxx"
+                                helperText="Generate at: myaccount.google.com/apppasswords"
+                            />
+                        </Box>
+                    )}
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={handleClose}>Cancel</Button>
                     <Button onClick={handleSave} variant="contained" color="primary">
-                        Save Token
+                        Save
                     </Button>
                 </DialogActions>
             </Dialog>
         </React.Fragment>
     );
 }
+

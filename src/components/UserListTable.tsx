@@ -4,10 +4,11 @@ import * as React from 'react';
 import {
     Box, Button, Paper, Typography, Alert, CircularProgress,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Checkbox, TablePagination
+    Checkbox, TablePagination, FormControl, InputLabel, Select, MenuItem
 } from '@mui/material';
 import axios from 'axios';
 import FollowUpDialog from './FollowUpDialog';
+import EmailDialog from './EmailDialog';
 import Snackbar from '@mui/material/Snackbar';
 
 interface UserData {
@@ -16,7 +17,11 @@ interface UserData {
     userName: string;
     phone: string;
     productName: string;
-    principal: number;
+    appName: string;
+    totalAmount: number;
+    repayAmount: number;
+    overdueFee: number;
+    overdueDay: number;
     repayTime: string;
     stageName: string;
     followResult: number;
@@ -33,11 +38,15 @@ export default function UserListTable() {
     const [loadingEmails, setLoadingEmails] = React.useState(false);
     const [rowCount, setRowCount] = React.useState(0);
     const [page, setPage] = React.useState(0);
-    const [pageSize, setPageSize] = React.useState(10);
+    const [pageSize, setPageSize] = React.useState(50);
     const [selected, setSelected] = React.useState<number[]>([]);
     const [hasToken, setHasToken] = React.useState(false);
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
+    const [isEmailDialogOpen, setIsEmailDialogOpen] = React.useState(false);
     const [snackbar, setSnackbar] = React.useState<{ open: boolean, message: string, severity: 'success' | 'error' } | null>(null);
+    // Filters
+    const [filterAppName, setFilterAppName] = React.useState<string>('');
+    const [filterOverdueDay, setFilterOverdueDay] = React.useState<string>('');
 
     React.useEffect(() => {
         setHasToken(!!localStorage.getItem('external_api_token'));
@@ -186,17 +195,65 @@ export default function UserListTable() {
         fetchUsers();
     };
 
+    // Apply filters
+    const filteredRows = React.useMemo(() => {
+        return rows.filter(row => {
+            if (filterAppName && row.appName !== filterAppName) return false;
+            if (filterOverdueDay && String(row.overdueDay) !== filterOverdueDay) return false;
+            return true;
+        });
+    }, [rows, filterAppName, filterOverdueDay]);
+
     return (
         <Paper sx={{ width: '100%', p: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h6">User List</Typography>
-                <Button
-                    variant="contained"
-                    disabled={selected.length === 0}
-                    onClick={() => setIsDialogOpen(true)}
-                >
-                    Add Follow Up (<span className="notranslate">{selected.length}</span>)
-                </Button>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                        variant="outlined"
+                        disabled={selected.length === 0}
+                        onClick={() => setIsEmailDialogOpen(true)}
+                    >
+                        Send Email (<span className="notranslate">{selected.length}</span>)
+                    </Button>
+                    <Button
+                        variant="contained"
+                        disabled={selected.length === 0}
+                        onClick={() => setIsDialogOpen(true)}
+                    >
+                        Add Follow Up (<span className="notranslate">{selected.length}</span>)
+                    </Button>
+                </Box>
+            </Box>
+
+            {/* Filters */}
+            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                    <InputLabel>App Name</InputLabel>
+                    <Select
+                        value={filterAppName}
+                        label="App Name"
+                        onChange={(e) => setFilterAppName(e.target.value)}
+                    >
+                        <MenuItem value="">All</MenuItem>
+                        {[...new Set(rows.map(r => r.appName).filter(Boolean))].map(app => (
+                            <MenuItem key={app} value={app}>{app}</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
+                <FormControl size="small" sx={{ minWidth: 150 }}>
+                    <InputLabel>Overdue Days</InputLabel>
+                    <Select
+                        value={filterOverdueDay}
+                        label="Overdue Days"
+                        onChange={(e) => setFilterOverdueDay(e.target.value)}
+                    >
+                        <MenuItem value="">All</MenuItem>
+                        {[...new Set(rows.map(r => r.overdueDay).filter(d => d !== undefined))].sort((a, b) => a - b).map(day => (
+                            <MenuItem key={day} value={String(day)}>{day} days</MenuItem>
+                        ))}
+                    </Select>
+                </FormControl>
             </Box>
 
             {!hasToken && (
@@ -221,17 +278,20 @@ export default function UserListTable() {
                                     <TableRow>
                                         <TableCell padding="checkbox">
                                             <Checkbox
-                                                indeterminate={selected.length > 0 && selected.length < rows.length}
-                                                checked={rows.length > 0 && selected.length === rows.length}
+                                                indeterminate={selected.length > 0 && selected.length < filteredRows.length}
+                                                checked={filteredRows.length > 0 && selected.length === filteredRows.length}
                                                 onChange={handleSelectAll}
                                             />
                                         </TableCell>
-                                        <TableCell>Task ID</TableCell>
                                         <TableCell>User Name</TableCell>
                                         <TableCell>Email</TableCell>
                                         <TableCell>Phone</TableCell>
+                                        <TableCell>App Name</TableCell>
                                         <TableCell>Product</TableCell>
-                                        <TableCell align="right">Amount</TableCell>
+                                        <TableCell align="right">Contract Amount</TableCell>
+                                        <TableCell align="right">Total Amount</TableCell>
+                                        <TableCell align="right">Overdue Fee</TableCell>
+                                        <TableCell align="right">Overdue Days</TableCell>
                                         <TableCell>Repay Time</TableCell>
                                         <TableCell>Stage</TableCell>
                                         <TableCell>Result</TableCell>
@@ -239,7 +299,7 @@ export default function UserListTable() {
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {rows.map((row) => {
+                                    {filteredRows.map((row) => {
                                         const isItemSelected = isSelected(row.taskId);
                                         return (
                                             <TableRow
@@ -253,12 +313,15 @@ export default function UserListTable() {
                                                 <TableCell padding="checkbox">
                                                     <Checkbox checked={isItemSelected} />
                                                 </TableCell>
-                                                <TableCell>{row.taskId}</TableCell>
                                                 <TableCell>{row.userName}</TableCell>
                                                 <TableCell>{row.email || '-'}</TableCell>
                                                 <TableCell>{row.phone}</TableCell>
+                                                <TableCell>{row.appName || '-'}</TableCell>
                                                 <TableCell>{row.productName}</TableCell>
-                                                <TableCell align="right">{row.principal}</TableCell>
+                                                <TableCell align="right">{row.totalAmount}</TableCell>
+                                                <TableCell align="right">{row.repayAmount}</TableCell>
+                                                <TableCell align="right">{row.overdueFee}</TableCell>
+                                                <TableCell align="right">{row.overdueDay}</TableCell>
                                                 <TableCell>{row.repayTime}</TableCell>
                                                 <TableCell>{row.stageName}</TableCell>
                                                 <TableCell>{row.followResult}</TableCell>
@@ -266,9 +329,9 @@ export default function UserListTable() {
                                             </TableRow>
                                         );
                                     })}
-                                    {rows.length === 0 && (
+                                    {filteredRows.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={11} align="center">
+                                            <TableCell colSpan={14} align="center">
                                                 No data available
                                             </TableCell>
                                         </TableRow>
@@ -284,7 +347,7 @@ export default function UserListTable() {
                         onPageChange={handleChangePage}
                         rowsPerPage={pageSize}
                         onRowsPerPageChange={handleChangeRowsPerPage}
-                        rowsPerPageOptions={[10, 20, 50]}
+                        rowsPerPageOptions={[50, 100, 250]}
                     />
                 </>
             )}
@@ -294,6 +357,16 @@ export default function UserListTable() {
                 onClose={() => setIsDialogOpen(false)}
                 selectedTaskIds={selected}
                 onSuccess={handleFollowUpSuccess}
+            />
+
+            <EmailDialog
+                open={isEmailDialogOpen}
+                onClose={() => setIsEmailDialogOpen(false)}
+                selectedUsers={rows.filter(r => selected.includes(r.taskId))}
+                onSuccess={() => {
+                    setSnackbar({ open: true, message: 'Emails sent successfully', severity: 'success' });
+                    setIsEmailDialogOpen(false);
+                }}
             />
 
             <Snackbar
