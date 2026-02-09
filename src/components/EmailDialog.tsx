@@ -27,8 +27,13 @@ interface UserData {
     email?: string;
     userName: string;
     phone: string;
+    appName?: string;
     productName: string;
-    principal: number;
+    principal?: number;
+    totalAmount?: number;
+    repayAmount?: number;
+    overdueFee?: number;
+    overdueDay?: number;
     repayTime: string;
     stageName: string;
     idNoUrl?: string;
