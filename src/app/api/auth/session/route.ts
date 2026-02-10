@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT } from '@/lib/auth';
+import { verifyJWT, validateSession, destroySession } from '@/lib/auth';
 
 // Check if current session is still valid
-// NOTE: Currently uses JWT-only validation (no server-side session check)
-// because Vercel serverless doesn't share in-memory state between instances.
-// TODO: Add Vercel KV (free tier) to enable single-session enforcement.
 export async function GET(request: NextRequest) {
     const token = request.cookies.get('auth_token')?.value;
 
@@ -17,15 +14,38 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ valid: false, reason: 'invalid_token' }, { status: 401 });
     }
 
-    // JWT is valid and not expired — session is good
+    // Server-side session check (now async and supports Redis)
+    const isValid = await validateSession(payload.userId, payload.sessionId);
+    if (!isValid) {
+        return NextResponse.json({
+            valid: false,
+            reason: 'session_ended',
+            message: 'Your session was ended because the account was accessed from another location.',
+        }, { status: 401 });
+    }
+
     return NextResponse.json({
         valid: true,
         user: { name: payload.userId },
     });
 }
 
-// Logout - clear cookie
+// Logout - destroy session and clear cookie
 export async function DELETE(request: NextRequest) {
+    const token = request.cookies.get('auth_token')?.value;
+
+    if (token) {
+        const payload = verifyJWT(token);
+        if (payload) {
+            // Best effort to destroy session (now async)
+            try {
+                await destroySession(payload.userId);
+            } catch (e) {
+                console.error("Failed to destroy session:", e);
+            }
+        }
+    }
+
     const response = NextResponse.json({ success: true });
     response.cookies.delete('auth_token');
     return response;

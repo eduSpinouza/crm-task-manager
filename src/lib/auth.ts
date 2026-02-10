@@ -1,4 +1,5 @@
 import { createHmac, randomBytes, timingSafeEqual, scryptSync } from 'crypto';
+import { Redis } from '@upstash/redis';
 
 // ============================================================
 // Password Hashing (scrypt - Node.js built-in, no dependencies)
@@ -86,7 +87,7 @@ export function verifyJWT(token: string): JWTPayload | null {
 }
 
 // ============================================================
-// Session Store (in-memory, swappable interface for future persistence)
+// Session Store (Redis or In-Memory)
 // ============================================================
 
 export interface SessionInfo {
@@ -97,43 +98,99 @@ export interface SessionInfo {
     createdAt: number;
 }
 
-// Interface for future swap to Redis/Postgres
 export interface SessionStore {
-    set(userId: string, session: SessionInfo): void;
-    get(userId: string): SessionInfo | undefined;
-    delete(userId: string): void;
-    isValid(userId: string, sessionId: string): boolean;
+    set(userId: string, session: SessionInfo): Promise<void>;
+    get(userId: string): Promise<SessionInfo | undefined>;
+    delete(userId: string): Promise<void>;
+    isValid(userId: string, sessionId: string): Promise<boolean>;
 }
 
 class InMemorySessionStore implements SessionStore {
     private sessions = new Map<string, SessionInfo>();
 
-    set(userId: string, session: SessionInfo): void {
+    async set(userId: string, session: SessionInfo): Promise<void> {
         this.sessions.set(userId, session);
     }
 
-    get(userId: string): SessionInfo | undefined {
+    async get(userId: string): Promise<SessionInfo | undefined> {
         return this.sessions.get(userId);
     }
 
-    delete(userId: string): void {
+    async delete(userId: string): Promise<void> {
         this.sessions.delete(userId);
     }
 
-    isValid(userId: string, sessionId: string): boolean {
+    async isValid(userId: string, sessionId: string): Promise<boolean> {
         const session = this.sessions.get(userId);
         return session?.sessionId === sessionId;
     }
 }
 
-// Singleton session store
-export const sessionStore: SessionStore = new InMemorySessionStore();
+class RedisSessionStore implements SessionStore {
+    private redis: Redis;
+
+    constructor() {
+        // Try creating from standard Upstash env vars
+        // If not set, it will throw, but we only instantiate this if they ARE set
+        try {
+            this.redis = Redis.fromEnv();
+        } catch (e) {
+            // Fallback for Vercel KV legacy env vars if needed, or manual config
+            const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+            const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+            if (!url || !token) {
+                throw new Error("Redis credentials missing");
+            }
+            this.redis = new Redis({ url, token });
+        }
+    }
+
+    private getKey(userId: string): string {
+        return `session:${userId}`;
+    }
+
+    async set(userId: string, session: SessionInfo): Promise<void> {
+        // Store session with 24h hard expiry to match JWT
+        await this.redis.set(this.getKey(userId), session, { ex: 86400 });
+    }
+
+    async get(userId: string): Promise<SessionInfo | undefined> {
+        const session = await this.redis.get<SessionInfo>(this.getKey(userId));
+        return session || undefined;
+    }
+
+    async delete(userId: string): Promise<void> {
+        await this.redis.del(this.getKey(userId));
+    }
+
+    async isValid(userId: string, sessionId: string): Promise<boolean> {
+        const session = await this.get(userId);
+        return session?.sessionId === sessionId;
+    }
+}
+
+// Factory to choose store
+function createSessionStore(): SessionStore {
+    // Check for Upstash/Vercel KV env vars
+    const hasRedis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) ||
+        (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+
+    if (hasRedis) {
+        console.log('Using RedisSessionStore');
+        return new RedisSessionStore();
+    } else {
+        console.log('Using InMemorySessionStore (sessions will reset on deploy)');
+        return new InMemorySessionStore();
+    }
+}
+
+export const sessionStore: SessionStore = createSessionStore();
 
 // ============================================================
 // Session Management
 // ============================================================
 
-export function createSession(userId: string, ip: string, userAgent: string): SessionInfo {
+export async function createSession(userId: string, ip: string, userAgent: string): Promise<SessionInfo> {
     const session: SessionInfo = {
         sessionId: randomBytes(32).toString('hex'),
         userId,
@@ -142,18 +199,18 @@ export function createSession(userId: string, ip: string, userAgent: string): Se
         createdAt: Date.now(),
     };
 
-    // This automatically invalidates any previous session for this user
-    sessionStore.set(userId, session);
+    // This automatically invalidates any previous session for this user (by overwriting)
+    await sessionStore.set(userId, session);
 
     return session;
 }
 
-export function validateSession(userId: string, sessionId: string): boolean {
+export async function validateSession(userId: string, sessionId: string): Promise<boolean> {
     return sessionStore.isValid(userId, sessionId);
 }
 
-export function destroySession(userId: string): void {
-    sessionStore.delete(userId);
+export async function destroySession(userId: string): Promise<void> {
+    await sessionStore.delete(userId);
 }
 
 // ============================================================

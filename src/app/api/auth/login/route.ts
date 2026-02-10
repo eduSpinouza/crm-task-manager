@@ -21,7 +21,7 @@ export async function POST(request: NextRequest) {
         const userAgent = request.headers.get('user-agent') || 'unknown';
 
         // Create session (invalidates any previous session for this user)
-        const session = createSession(user.username, ip, userAgent);
+        const session = await createSession(user.username, ip, userAgent);
 
         // Sign JWT with session ID
         const token = signJWT({
