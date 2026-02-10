@@ -1,23 +1,57 @@
 'use client';
 
 import * as React from 'react';
-import { Box, AppBar, Toolbar, Typography, Button, Container } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, Button, Container, Alert, Snackbar } from '@mui/material';
 import { useRouter } from 'next/navigation';
+import axios from 'axios';
 import TokenSettings from '@/components/TokenSettings';
 import UserListTable from '@/components/UserListTable';
 
 export default function DashboardPage() {
     const router = useRouter();
+    const [sessionAlert, setSessionAlert] = React.useState('');
 
+    // Verify session on mount
     React.useEffect(() => {
-        const token = localStorage.getItem('token');
-        if (!token) {
-            router.push('/login');
-        }
-    }, [router]);
+        checkSession();
+    }, []);
 
-    const handleLogout = () => {
-        localStorage.removeItem('token');
+    // Poll session every 30 seconds
+    React.useEffect(() => {
+        const interval = setInterval(checkSession, 30000);
+        return () => clearInterval(interval);
+    }, []);
+
+    const checkSession = async () => {
+        try {
+            const response = await axios.get('/api/auth/session');
+            if (!response.data?.valid) {
+                handleSessionExpired(response.data?.message);
+            }
+        } catch (err: any) {
+            if (err.response?.status === 401) {
+                const reason = err.response?.data?.reason;
+                if (reason === 'session_ended') {
+                    handleSessionExpired('Your session was ended because the account was accessed from another location.');
+                } else {
+                    handleSessionExpired('Session expired. Please log in again.');
+                }
+            }
+        }
+    };
+
+    const handleSessionExpired = (message?: string) => {
+        localStorage.removeItem('user');
+        const reason = message?.includes('another location') ? 'session_ended' : 'expired';
+        router.push(`/login?reason=${reason}`);
+    };
+
+    const handleLogout = async () => {
+        try {
+            await axios.delete('/api/auth/session');
+        } catch {
+            // Continue with logout even if API call fails
+        }
         localStorage.removeItem('user');
         router.push('/login');
     };
@@ -36,6 +70,16 @@ export default function DashboardPage() {
             <Container maxWidth="xl" sx={{ mt: 4 }}>
                 <UserListTable />
             </Container>
+
+            <Snackbar
+                open={!!sessionAlert}
+                autoHideDuration={6000}
+                onClose={() => setSessionAlert('')}
+            >
+                <Alert severity="warning" onClose={() => setSessionAlert('')}>
+                    {sessionAlert}
+                </Alert>
+            </Snackbar>
         </Box>
     );
 }
