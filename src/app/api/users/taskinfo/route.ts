@@ -6,6 +6,7 @@ export async function GET(request: NextRequest) {
     const taskId = searchParams.get('taskId');
     const orderId = searchParams.get('orderId');
     const token = request.headers.get('authorization');
+    const baseUrl = request.headers.get('x-api-base-url');
 
     if (!taskId || !orderId) {
         return NextResponse.json({ error: 'taskId and orderId are required' }, { status: 400 });
@@ -15,11 +16,14 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ error: 'Authorization token is required' }, { status: 401 });
     }
 
+    if (!baseUrl) {
+        return NextResponse.json({ error: 'Missing API base URL. Configure it in Settings.' }, { status: 400 });
+    }
+
     try {
         const v = Date.now();
-        const targetUrl = `https://crm.cashimex.mx/api/manage/urge/task/getTaskInfo/${taskId}/${orderId}?v=${v}`;
+        const targetUrl = `${baseUrl}/api/manage/urge/task/getTaskInfo/${taskId}/${orderId}?v=${v}`;
 
-        // Use same auth pattern as list endpoint
         const authToken = token.startsWith('Bear ') ? token : `Bear ${token}`;
 
         const response = await axios.get(targetUrl, {

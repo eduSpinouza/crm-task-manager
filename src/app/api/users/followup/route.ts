@@ -6,9 +6,14 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 export async function POST(request: NextRequest) {
     const token = request.headers.get('Authorization');
+    const baseUrl = request.headers.get('X-API-Base-URL');
 
     if (!token) {
         return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 });
+    }
+
+    if (!baseUrl) {
+        return NextResponse.json({ error: 'Missing API base URL. Configure it in Settings.' }, { status: 400 });
     }
 
     try {
@@ -21,23 +26,19 @@ export async function POST(request: NextRequest) {
         const results = [];
         const errors = [];
 
-        // URL with dynamic timestamp
         const v = Date.now();
-        const targetUrl = `https://crm.cashimex.mx/api/manage/urge/task/addFollow?v=${v}`;
+        const targetUrl = `${baseUrl}/api/manage/urge/task/addFollow?v=${v}`;
 
-        // Auth token with Bear prefix (matching other routes)
         const authToken = token.startsWith('Bear ') ? token : `Bear ${token}`;
 
         for (const taskId of taskIds) {
-            // Loop with delay
-            await delay(500); // 500ms delay to prevent rate limiting
+            await delay(500);
 
             const payload = {
                 taskId,
                 note,
                 followResult,
                 ...otherData
-                // Expected: phone, followTarget="0", ptpTime=null etc. passed from frontend
             };
 
             try {

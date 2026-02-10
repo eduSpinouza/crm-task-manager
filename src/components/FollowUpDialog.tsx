@@ -49,6 +49,7 @@ export default function FollowUpDialog({ open, onClose, selectedTaskIds, onSucce
         setLoading(true);
         try {
             const token = localStorage.getItem('external_api_token');
+            const baseUrl = localStorage.getItem('api_base_url') || '';
             await axios.post('/api/users/followup', {
                 taskIds: selectedTaskIds,
                 note,
@@ -56,7 +57,7 @@ export default function FollowUpDialog({ open, onClose, selectedTaskIds, onSucce
                 followTarget: String(followTarget),
                 phone: "0000000000" // Placeholder - backend handles per-task
             }, {
-                headers: { Authorization: token }
+                headers: { Authorization: token, 'X-API-Base-URL': baseUrl }
             });
             onSuccess();
             setNote('');

@@ -49,14 +49,15 @@ export default function UserListTable() {
     const [filterOverdueDay, setFilterOverdueDay] = React.useState<string>('');
 
     React.useEffect(() => {
-        setHasToken(!!localStorage.getItem('external_api_token'));
+        setHasToken(!!localStorage.getItem('external_api_token') && !!localStorage.getItem('api_base_url'));
     }, []);
 
     // Fetch task info (email, idNoUrl, livingNessUrl) for a single row
     const fetchTaskInfo = async (taskId: number, orderId: number, token: string): Promise<Partial<UserData>> => {
         try {
+            const baseUrl = localStorage.getItem('api_base_url') || '';
             const response = await axios.get(`/api/users/taskinfo?taskId=${taskId}&orderId=${orderId}`, {
-                headers: { Authorization: token }
+                headers: { Authorization: token, 'X-API-Base-URL': baseUrl }
             });
 
             if (response.data?.success && response.data?.data) {
@@ -110,12 +111,13 @@ export default function UserListTable() {
                 setLoading(false);
                 return;
             }
+            const baseUrl = localStorage.getItem('api_base_url') || '';
 
             const response = await axios.post('/api/users/list', {
                 current: page + 1,
                 size: pageSize,
             }, {
-                headers: { Authorization: token }
+                headers: { Authorization: token, 'X-API-Base-URL': baseUrl }
             });
 
             console.log("Response Data: ", JSON.stringify(response.data));

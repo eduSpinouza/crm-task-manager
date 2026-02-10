@@ -8,10 +8,8 @@ import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
 import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
-import IconButton from '@mui/material/IconButton';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 
@@ -19,12 +17,14 @@ export default function TokenSettings() {
     const [open, setOpen] = React.useState(false);
     const [tabIndex, setTabIndex] = React.useState(0);
     const [token, setToken] = React.useState('');
+    const [apiBaseUrl, setApiBaseUrl] = React.useState('');
     const [emailSender, setEmailSender] = React.useState('');
     const [emailPassword, setEmailPassword] = React.useState('');
 
     const handleClickOpen = () => {
         // Load existing settings
         setToken(localStorage.getItem('external_api_token') || '');
+        setApiBaseUrl(localStorage.getItem('api_base_url') || '');
         setEmailSender(localStorage.getItem('email_sender') || '');
         setEmailPassword(localStorage.getItem('email_app_password') || '');
         setOpen(true);
@@ -36,6 +36,7 @@ export default function TokenSettings() {
 
     const handleSave = () => {
         localStorage.setItem('external_api_token', token);
+        localStorage.setItem('api_base_url', apiBaseUrl.replace(/\/+$/, '')); // Remove trailing slashes
         localStorage.setItem('email_sender', emailSender);
         localStorage.setItem('email_app_password', emailPassword);
         // Reload page to apply changes immediately
@@ -57,17 +58,27 @@ export default function TokenSettings() {
                 <DialogTitle>Configuration</DialogTitle>
                 <DialogContent>
                     <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 2 }}>
-                        <Tab label="API Token" />
+                        <Tab label="API" />
                         <Tab label="Email" />
                     </Tabs>
 
                     {tabIndex === 0 && (
                         <Box>
                             <DialogContentText sx={{ mb: 2 }}>
-                                Paste the Bearer Token from the external CRM. Required to fetch data.
+                                Configure the external CRM connection. Both fields are required to fetch data.
                             </DialogContentText>
                             <TextField
-                                autoFocus
+                                margin="dense"
+                                label="API Base URL"
+                                type="url"
+                                fullWidth
+                                variant="outlined"
+                                value={apiBaseUrl}
+                                onChange={(e) => setApiBaseUrl(e.target.value)}
+                                placeholder="https://crm.example.com"
+                                helperText="The base domain of the CRM API (without trailing slash)"
+                            />
+                            <TextField
                                 margin="dense"
                                 label="Bearer Token"
                                 type="text"
@@ -120,4 +131,3 @@ export default function TokenSettings() {
         </React.Fragment>
     );
 }
-

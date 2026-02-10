@@ -3,34 +3,23 @@ import axios from 'axios';
 
 export async function POST(request: NextRequest) {
     const token = request.headers.get('Authorization');
+    const baseUrl = request.headers.get('X-API-Base-URL');
 
     if (!token) {
         return NextResponse.json({ error: 'Unauthorized: Missing token' }, { status: 401 });
     }
 
+    if (!baseUrl) {
+        return NextResponse.json({ error: 'Missing API base URL. Configure it in Settings.' }, { status: 400 });
+    }
+
     try {
         const body = await request.json();
 
-        // Default payload structure based on user request
-        // The frontend should send { current: page, size: 10, ...filters }
-
-        // Generate dynamic URL parameters
-        const now = new Date();
-        // const v = now.getFullYear().toString() +
-        //     (now.getMonth() + 1).toString().padStart(2, '0') +
-        //     now.getDate().toString().padStart(2, '0');
         const v = Date.now();
-        const targetUrl = `https://crm.cashimex.mx/api/manage/urge/task/waitUrgeTaskPage?v=${v}`;
-        // Note: The v and t params here seem to be checked by the server, but might be static or dynamic.
-        // For list fetch, user provided: v=653704202&t=1769114579708
-        // We can try to make them dynamic or use the user's provided ones. Let's use dynamic to be safe, or static if that fails.
-        // Given the login worked with dynamic (assumed), we'll try dynamic here too or strip them if not strictly needed?
-        // User provided URL has them. Let's keep the user's provided URL parameters for now to ensure it works as verified by them.
+        const targetUrl = `${baseUrl}/api/manage/urge/task/waitUrgeTaskPage?v=${v}`;
 
-        // Actually, let's use the exact URL provided by user for the list endpoint.
-
-        // The external API uses 'authentication' header with 'Bear ' prefix (not 'Authorization' / 'Bearer')
-        // If the token already includes 'Bear ', use it as-is; otherwise prepend it
+        // The external API uses 'authentication' header with 'Bear ' prefix
         const authToken = token.startsWith('Bear ') ? token : `Bear ${token}`;
 
         const response = await axios.post(
