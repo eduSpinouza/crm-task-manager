@@ -22,9 +22,10 @@ export function verifyPassword(password: string, storedHash: string): boolean {
 // JWT (HMAC-SHA256 - Node.js built-in, no dependencies)
 // ============================================================
 
-interface JWTPayload {
+export interface JWTPayload {
     userId: string;
     sessionId: string;
+    role: 'admin' | 'user';
     iat: number;
     exp: number;
 }
@@ -130,12 +131,9 @@ class RedisSessionStore implements SessionStore {
     private redis: Redis;
 
     constructor() {
-        // Try creating from standard Upstash env vars
-        // If not set, it will throw, but we only instantiate this if they ARE set
         try {
             this.redis = Redis.fromEnv();
         } catch (e) {
-            // Fallback for Vercel KV legacy env vars if needed, or manual config
             const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
             const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
             if (!url || !token) {
@@ -150,7 +148,6 @@ class RedisSessionStore implements SessionStore {
     }
 
     async set(userId: string, session: SessionInfo): Promise<void> {
-        // Store session with 24h hard expiry to match JWT
         await this.redis.set(this.getKey(userId), session, { ex: 86400 });
     }
 
@@ -171,7 +168,6 @@ class RedisSessionStore implements SessionStore {
 
 // Factory to choose store
 function createSessionStore(): SessionStore {
-    // Check for Upstash/Vercel KV env vars
     const hasRedis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) ||
         (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
 
@@ -199,9 +195,7 @@ export async function createSession(userId: string, ip: string, userAgent: strin
         createdAt: Date.now(),
     };
 
-    // This automatically invalidates any previous session for this user (by overwriting)
     await sessionStore.set(userId, session);
-
     return session;
 }
 
@@ -214,20 +208,190 @@ export async function destroySession(userId: string): Promise<void> {
 }
 
 // ============================================================
-// User Store (reads from environment variable)
+// User Store (Redis-backed with USERS_CONFIG env var fallback)
 // ============================================================
+
+export type UserRole = 'admin' | 'user';
 
 export interface UserConfig {
     username: string;
     passwordHash: string;
+    role: UserRole;
+    createdAt?: number;
+    createdBy?: string;
 }
 
-export function getUsers(): UserConfig[] {
-    const usersJson = process.env.USERS_CONFIG;
-    if (!usersJson) {
-        console.warn('USERS_CONFIG env var not set, no users configured');
-        return [];
+// Get a Redis client for user storage (reuse session store's Redis if available)
+function getUserRedis(): Redis | null {
+    const hasRedis = (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) ||
+        (process.env.KV_REST_API_URL && process.env.KV_REST_API_TOKEN);
+
+    if (!hasRedis) return null;
+
+    try {
+        return Redis.fromEnv();
+    } catch {
+        const url = process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL;
+        const token = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN;
+        if (!url || !token) return null;
+        return new Redis({ url, token });
     }
+}
+
+function userKey(username: string): string {
+    return `user:${username}`;
+}
+
+// ---- Read operations (Redis-first, then env var fallback) ----
+
+export async function findUserAsync(username: string): Promise<UserConfig | undefined> {
+    // Try Redis first
+    const redis = getUserRedis();
+    if (redis) {
+        const user = await redis.get<UserConfig>(userKey(username));
+        if (user) return user;
+    }
+
+    // Fallback to USERS_CONFIG env var (assumes role: 'admin' for legacy users)
+    const envUsers = getEnvUsers();
+    const envUser = envUsers.find(u => u.username === username);
+    if (envUser) return { ...envUser, role: envUser.role || 'admin' };
+
+    return undefined;
+}
+
+export async function listUsersAsync(): Promise<UserConfig[]> {
+    const redis = getUserRedis();
+    if (!redis) {
+        // No Redis — return env var users
+        return getEnvUsers().map(u => ({ ...u, role: u.role || 'admin' as UserRole }));
+    }
+
+    // Get all user keys from Redis
+    const keys = await redis.keys('user:*');
+    if (keys.length === 0) {
+        // No users in Redis yet — return env var users as fallback
+        return getEnvUsers().map(u => ({ ...u, role: u.role || 'admin' as UserRole }));
+    }
+
+    const users: UserConfig[] = [];
+    for (const key of keys) {
+        const user = await redis.get<UserConfig>(key);
+        if (user) users.push(user);
+    }
+    return users;
+}
+
+// ---- Write operations (Redis only) ----
+
+export async function createUser(
+    username: string,
+    password: string,
+    role: UserRole,
+    createdBy: string
+): Promise<UserConfig> {
+    const redis = getUserRedis();
+    if (!redis) {
+        throw new Error('Redis is required for user management. Configure Upstash Redis env vars.');
+    }
+
+    // Check if user already exists
+    const existing = await redis.get(userKey(username));
+    if (existing) {
+        throw new Error(`User "${username}" already exists`);
+    }
+
+    const user: UserConfig = {
+        username,
+        passwordHash: hashPassword(password),
+        role,
+        createdAt: Date.now(),
+        createdBy,
+    };
+
+    await redis.set(userKey(username), user);
+    return user;
+}
+
+export async function deleteUserAsync(username: string, requestedBy: string): Promise<void> {
+    const redis = getUserRedis();
+    if (!redis) {
+        throw new Error('Redis is required for user management.');
+    }
+
+    if (username === requestedBy) {
+        throw new Error('Cannot delete your own account');
+    }
+
+    const existing = await redis.get(userKey(username));
+    if (!existing) {
+        throw new Error(`User "${username}" not found`);
+    }
+
+    await redis.del(userKey(username));
+
+    // Also destroy their session if active
+    await destroySession(username);
+}
+
+export async function seedUsersFromEnv(adminPassword?: string): Promise<{ seeded: string[], skipped: string[], admin?: string }> {
+    const redis = getUserRedis();
+    if (!redis) {
+        throw new Error('Redis is required for seeding.');
+    }
+
+    const seeded: string[] = [];
+    const skipped: string[] = [];
+    let adminCreated: string | undefined;
+
+    // 1. Create default superadmin if password provided and doesn't exist yet
+    if (adminPassword) {
+        const adminUsername = 'superadmin';
+        const existingAdmin = await redis.get(userKey(adminUsername));
+        if (existingAdmin) {
+            skipped.push(adminUsername);
+        } else {
+            const admin: UserConfig = {
+                username: adminUsername,
+                passwordHash: hashPassword(adminPassword),
+                role: 'admin',
+                createdAt: Date.now(),
+                createdBy: 'seed',
+            };
+            await redis.set(userKey(adminUsername), admin);
+            seeded.push(adminUsername);
+            adminCreated = adminUsername;
+        }
+    }
+
+    // 2. Seed USERS_CONFIG users as regular 'user' role
+    const envUsers = getEnvUsers();
+    for (const user of envUsers) {
+        const existing = await redis.get(userKey(user.username));
+        if (existing) {
+            skipped.push(user.username);
+            continue;
+        }
+
+        const fullUser: UserConfig = {
+            ...user,
+            role: 'user',
+            createdAt: Date.now(),
+            createdBy: 'seed',
+        };
+
+        await redis.set(userKey(user.username), fullUser);
+        seeded.push(user.username);
+    }
+
+    return { seeded, skipped, admin: adminCreated };
+}
+
+// ---- Sync functions (backward-compatible, used by login) ----
+
+function getEnvUsers(): UserConfig[] {
+    const usersJson = process.env.USERS_CONFIG;
+    if (!usersJson) return [];
     try {
         return JSON.parse(usersJson);
     } catch (e) {
@@ -236,12 +400,26 @@ export function getUsers(): UserConfig[] {
     }
 }
 
+// Legacy sync functions — still used by tests and backward compat
+export function getUsers(): UserConfig[] {
+    return getEnvUsers().map(u => ({ ...u, role: u.role || 'admin' as UserRole }));
+}
+
 export function findUser(username: string): UserConfig | undefined {
-    return getUsers().find(u => u.username === username);
+    const users = getUsers();
+    return users.find(u => u.username === username);
 }
 
 export function authenticateUser(username: string, password: string): UserConfig | null {
     const user = findUser(username);
+    if (!user) return null;
+    if (!verifyPassword(password, user.passwordHash)) return null;
+    return user;
+}
+
+// Async version — checks Redis first, then env var
+export async function authenticateUserAsync(username: string, password: string): Promise<UserConfig | null> {
+    const user = await findUserAsync(username);
     if (!user) return null;
     if (!verifyPassword(password, user.passwordHash)) return null;
     return user;

@@ -2,14 +2,18 @@
 
 import * as React from 'react';
 import { Box, AppBar, Toolbar, Typography, Button, Container, Alert, Snackbar } from '@mui/material';
+import PeopleIcon from '@mui/icons-material/People';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import TokenSettings from '@/components/TokenSettings';
 import UserListTable from '@/components/UserListTable';
+import UserManagementDialog from '@/components/UserManagementDialog';
 
 export default function DashboardPage() {
     const router = useRouter();
     const [sessionAlert, setSessionAlert] = React.useState('');
+    const [userRole, setUserRole] = React.useState<string>('user');
+    const [usersDialogOpen, setUsersDialogOpen] = React.useState(false);
 
     // Verify session on mount
     React.useEffect(() => {
@@ -27,6 +31,9 @@ export default function DashboardPage() {
             const response = await axios.get('/api/auth/session');
             if (!response.data?.valid) {
                 handleSessionExpired(response.data?.message);
+            } else {
+                // Store role from session check
+                setUserRole(response.data.user?.role || 'user');
             }
         } catch (err: any) {
             if (err.response?.status === 401) {
@@ -63,6 +70,16 @@ export default function DashboardPage() {
                     <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
                         CRM Dashboard
                     </Typography>
+                    {userRole === 'admin' && (
+                        <Button
+                            color="inherit"
+                            startIcon={<PeopleIcon />}
+                            onClick={() => setUsersDialogOpen(true)}
+                            sx={{ mr: 1 }}
+                        >
+                            Manage Users
+                        </Button>
+                    )}
                     <TokenSettings />
                     <Button color="inherit" onClick={handleLogout}>Logout</Button>
                 </Toolbar>
@@ -70,6 +87,11 @@ export default function DashboardPage() {
             <Container maxWidth="xl" sx={{ mt: 4 }}>
                 <UserListTable />
             </Container>
+
+            <UserManagementDialog
+                open={usersDialogOpen}
+                onClose={() => setUsersDialogOpen(false)}
+            />
 
             <Snackbar
                 open={!!sessionAlert}

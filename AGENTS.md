@@ -15,7 +15,10 @@
 src/
 ├── app/
 │   ├── api/                    # Next.js API Routes (backend proxy)
-│   │   ├── auth/login/         # Mock internal authentication
+│   │   ├── admin/
+│   │   │   ├── users/          # Admin CRUD for user management
+│   │   │   └── seed/           # One-time seed from USERS_CONFIG to Redis
+│   │   ├── auth/login/         # JWT authentication
 │   │   ├── email/send/         # Email sending endpoint
 │   │   └── users/
 │   │       ├── list/           # Proxy: fetch user list
@@ -29,9 +32,11 @@ src/
 │   ├── UserListTable.tsx       # Main data table with filters
 │   ├── FollowUpDialog.tsx      # Dialog for submitting follow-ups
 │   ├── EmailDialog.tsx         # Dialog for composing/sending emails
-│   └── TokenSettings.tsx       # Settings: API token + email config (tabbed)
+│   ├── TokenSettings.tsx       # Settings: API token + email config (tabbed)
+│   └── UserManagementDialog.tsx # Admin: user CRUD dialog
 ├── lib/
-│   ├── auth.ts                 # Auth: hashing, JWT, session store
+│   ├── auth.ts                 # Auth: hashing, JWT, session store, user CRUD
+│   ├── __tests__/auth.test.ts  # Vitest regression tests (26 tests)
 │   └── email/
 │       ├── EmailProvider.ts    # Interface for email providers
 │       ├── EmailService.ts     # Email orchestration + placeholder replacement
@@ -45,13 +50,14 @@ src/
 
 ### Internal Auth (JWT + Single-Session)
 1. **Login**: POST `/api/auth/login` with username/password
-2. **Validation**: Credentials checked against `USERS_CONFIG` env var (scrypt hashes)
-3. **Session**: Server creates session ID, stores in in-memory Map (one active session per user)
-4. **JWT**: Signed token set as `httpOnly` cookie (`auth_token`)
+2. **Validation**: Credentials checked against Redis first, then `USERS_CONFIG` env var fallback (scrypt hashes)
+3. **Session**: Server creates session ID, stores in Redis (or in-memory fallback)
+4. **JWT**: Signed token (includes `role`) set as `httpOnly` cookie (`auth_token`)
 5. **Middleware**: Checks cookie on every protected route
 6. **Session Polling**: Dashboard polls `/api/auth/session` every 30s
 7. **Single-Session**: New login invalidates previous session → old device gets kicked
 8. **Logout**: DELETE `/api/auth/session` → destroys session + clears cookie
+9. **Roles**: JWT includes `role` field (`admin` | `user`). Admin gets access to user management.
 
 ### External CRM API Token
 - User manually configures the external CRM Bearer token via Settings dialog
@@ -62,12 +68,22 @@ src/
 | Route | Method | Purpose |
 |-------|--------|---------|
 | `/api/auth/login` | POST | Authenticate + create session |
-| `/api/auth/session` | GET | Check session health |
+| `/api/auth/session` | GET | Check session health (returns role) |
 | `/api/auth/session` | DELETE | Logout + destroy session |
 | `/api/auth/setup` | GET | Generate password hash (dev only) |
 
-### Session Store Interface
-`SessionStore` interface in `src/lib/auth.ts` is swappable for future persistence (Redis/Postgres). Currently uses in-memory Map (resets on deploy).
+### Admin API Routes
+| Route | Method | Purpose |
+|-------|--------|---------|
+| `/api/admin/users` | GET | List all users (admin only) |
+| `/api/admin/users` | POST | Create user (admin only) |
+| `/api/admin/users` | DELETE | Delete user (admin only) |
+| `/api/admin/seed` | POST | Seed users from `USERS_CONFIG` to Redis |
+
+### Session & User Store
+- **Session store**: Redis (via Upstash/Vercel KV) with in-memory fallback
+- **User store**: Redis-first with `USERS_CONFIG` env var fallback
+- Auto-detects Redis from `KV_REST_API_URL`/`UPSTASH_REDIS_REST_URL` env vars
 
 ## External API Details
 **Base URL**: `https://crm.cashimex.mx/api/manage/`
@@ -166,16 +182,15 @@ git add -A; git commit -m "message"; git push
 | Variable | Purpose |
 |----------|--------|
 | `JWT_SECRET` | Secret key for signing JWT tokens (32+ random chars) |
-| `USERS_CONFIG` | JSON array of `{username, passwordHash}` objects |
-
-### Generating Password Hashes
-- **Dev**: Visit `GET /api/auth/setup?password=yourpassword`
-- **Manual**: `node -p "const c=require('crypto');const s=c.randomBytes(16).toString('hex');s+':'+c.scryptSync('yourpass',s,64).toString('hex')"`
+| `USERS_CONFIG` | JSON array of `{username, passwordHash}` objects (fallback) |
+| `KV_REST_API_URL` | Upstash/Vercel KV REST URL (auto-set by Vercel) |
+| `KV_REST_API_TOKEN` | Upstash/Vercel KV REST token (auto-set by Vercel) |
+| `SEED_SECRET` | (Optional) Secret for `/api/admin/seed` in production |
 
 ### Adding New Users
-1. Generate password hash
-2. Add to `USERS_CONFIG`: `[{"username":"user1","passwordHash":"..."},...]`
-3. Redeploy (env var change)
+- **Admin UI**: Login as admin → "Manage Users" button → Add User form
+- **Seed from env**: POST `/api/admin/seed` to migrate `USERS_CONFIG` users to Redis
+- **Legacy**: Edit `USERS_CONFIG` env var (still works as fallback)
 
 ## Email Feature
 
@@ -284,6 +299,17 @@ Errors are learning opportunities. When something breaks:
 - **Email placeholders**: Including auto-embedded images via `{{idNoUrl}}`
 - **Newline preservation**: Email body converts `\n` to `<br>` in HTML
 - **Real auth**: JWT + single-session enforcement, middleware route protection
-- **Session management**: In-memory store with swappable `SessionStore` interface
+- **Redis sessions**: Upstash Redis for persistent sessions (Vercel KV)
+- **User management**: Admin role, Redis user store, CRUD API + UI dialog
+- **Vitest testing**: 26 regression tests for auth, JWT, sessions, user store
 - **Login page**: POST auth, httpOnly cookie, Suspense boundary, licensing warning
-- **Dashboard**: Session polling every 30s, kicked-user redirect
+- **Dashboard**: Session polling every 30s, kicked-user redirect, admin panel
+
+## Testing
+```bash
+# Run all tests
+nvs exec node/24.13.0/x64 npx vitest run
+
+# Test coverage: Password hashing, JWT sign/verify, session lifecycle,
+# single-session enforcement, user store from env vars
+```

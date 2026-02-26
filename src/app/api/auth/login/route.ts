@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUser, createSession, signJWT } from '@/lib/auth';
+import { authenticateUserAsync, createSession, signJWT } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
@@ -10,8 +10,8 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Username and password are required' }, { status: 400 });
         }
 
-        // Authenticate against stored credentials
-        const user = authenticateUser(username, password);
+        // Authenticate against Redis first, then USERS_CONFIG fallback
+        const user = await authenticateUserAsync(username, password);
         if (!user) {
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
         }
@@ -23,16 +23,17 @@ export async function POST(request: NextRequest) {
         // Create session (invalidates any previous session for this user)
         const session = await createSession(user.username, ip, userAgent);
 
-        // Sign JWT with session ID
+        // Sign JWT with session ID and role
         const token = signJWT({
             userId: user.username,
             sessionId: session.sessionId,
+            role: user.role || 'user',
         });
 
         // Set JWT as httpOnly cookie
         const response = NextResponse.json({
             success: true,
-            user: { name: user.username },
+            user: { name: user.username, role: user.role || 'user' },
             msg: 'Login successful',
             warning: 'This account is licensed for single-user access. Logging in from another device will end your current session.',
         });

@@ -14,7 +14,7 @@ export async function GET(request: NextRequest) {
         return NextResponse.json({ valid: false, reason: 'invalid_token' }, { status: 401 });
     }
 
-    // Server-side session check (now async and supports Redis)
+    // Server-side session check (Redis-backed)
     const isValid = await validateSession(payload.userId, payload.sessionId);
     if (!isValid) {
         return NextResponse.json({
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
         valid: true,
-        user: { name: payload.userId },
+        user: { name: payload.userId, role: payload.role || 'user' },
     });
 }
 
@@ -37,7 +37,6 @@ export async function DELETE(request: NextRequest) {
     if (token) {
         const payload = verifyJWT(token);
         if (payload) {
-            // Best effort to destroy session (now async)
             try {
                 await destroySession(payload.userId);
             } catch (e) {
