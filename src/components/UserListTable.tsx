@@ -30,6 +30,10 @@ interface UserData {
     email?: string;
     idNoUrl?: string;
     livingNessUrl?: string;
+    phonePrefix?: string;
+    contact1Phone?: string;
+    contact2Phone?: string;
+    contact3Phone?: string;
 }
 
 export default function UserListTable() {
@@ -65,7 +69,11 @@ export default function UserListTable() {
                 return {
                     email: data.email || data.userEmail || '',
                     idNoUrl: data.idNoUrl || '',
-                    livingNessUrl: data.livingNessUrl || ''
+                    livingNessUrl: data.livingNessUrl || '',
+                    phonePrefix: data.phonePrefix || data.phone || '',
+                    contact1Phone: data.contacts?.[0]?.phoneNumber || '',
+                    contact2Phone: data.contacts?.[1]?.phoneNumber || '',
+                    contact3Phone: data.contacts?.[2]?.phoneNumber || ''
                 };
             }
         } catch (error) {
@@ -357,7 +365,15 @@ export default function UserListTable() {
             <FollowUpDialog
                 open={isDialogOpen}
                 onClose={() => setIsDialogOpen(false)}
-                selectedTaskIds={selected}
+                selectedTasks={rows.filter(r => selected.includes(r.taskId)).map(r => ({
+                    taskId: r.taskId,
+                    orderId: r.orderId,
+                    phone: r.phone,
+                    phonePrefix: r.phonePrefix,
+                    contact1Phone: r.contact1Phone,
+                    contact2Phone: r.contact2Phone,
+                    contact3Phone: r.contact3Phone
+                }))}
                 onSuccess={handleFollowUpSuccess}
             />
 

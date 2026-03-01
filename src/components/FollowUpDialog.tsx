@@ -7,10 +7,20 @@ import {
 } from '@mui/material';
 import axios from 'axios';
 
+export interface SelectedTask {
+    taskId: number;
+    orderId: number;
+    phone?: string;
+    phonePrefix?: string;
+    contact1Phone?: string;
+    contact2Phone?: string;
+    contact3Phone?: string;
+}
+
 interface FollowUpDialogProps {
     open: boolean;
     onClose: () => void;
-    selectedTaskIds: number[];
+    selectedTasks: SelectedTask[];
     onSuccess: () => void;
 }
 
@@ -31,7 +41,7 @@ const CONTACT_RESULTS = [
     { value: 6, label: 'Bad attitude' },
 ];
 
-export default function FollowUpDialog({ open, onClose, selectedTaskIds, onSuccess }: FollowUpDialogProps) {
+export default function FollowUpDialog({ open, onClose, selectedTasks, onSuccess }: FollowUpDialogProps) {
     const [note, setNote] = React.useState('');
     const [followTarget, setFollowTarget] = React.useState<number>(0);
     const [followResult, setFollowResult] = React.useState<number>(3); // Default: Missed
@@ -51,7 +61,7 @@ export default function FollowUpDialog({ open, onClose, selectedTaskIds, onSucce
             const token = localStorage.getItem('external_api_token');
             const baseUrl = localStorage.getItem('api_base_url') || '';
             await axios.post('/api/users/followup', {
-                taskIds: selectedTaskIds,
+                tasks: selectedTasks,
                 note,
                 followResult: Number(followResult),
                 followTarget: String(followTarget),
@@ -71,7 +81,7 @@ export default function FollowUpDialog({ open, onClose, selectedTaskIds, onSucce
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-            <DialogTitle>Add Follow Up ({selectedTaskIds.length} selected)</DialogTitle>
+            <DialogTitle>Add Follow Up ({selectedTasks.length} selected)</DialogTitle>
             <DialogContent>
                 <FormControl fullWidth margin="dense">
                     <InputLabel>Follow-up Target</InputLabel>
