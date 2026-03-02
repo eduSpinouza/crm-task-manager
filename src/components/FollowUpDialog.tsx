@@ -65,7 +65,6 @@ export default function FollowUpDialog({ open, onClose, selectedTasks, onSuccess
                 note,
                 followResult: Number(followResult),
                 followTarget: String(followTarget),
-                phone: "0000000000" // Placeholder - backend handles per-task
             }, {
                 headers: { Authorization: token, 'X-API-Base-URL': baseUrl }
             });

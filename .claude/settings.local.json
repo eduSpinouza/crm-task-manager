@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(xargs grep:*)"
+      "Bash(xargs grep:*)",
+      "Bash(nvs exec:*)",
+      "Bash(npx vitest:*)",
+      "Bash(powershell.exe:*)"
     ]
   }
 }
