@@ -34,6 +34,7 @@ interface UserData {
     contact1Phone?: string;
     contact2Phone?: string;
     contact3Phone?: string;
+    totalExtensionAmount?: number;
 }
 
 export default function UserListTable() {
@@ -73,7 +74,8 @@ export default function UserListTable() {
                     phonePrefix: data.phonePrefix || data.phone || '',
                     contact1Phone: data.contacts?.[0]?.phoneNumber || '',
                     contact2Phone: data.contacts?.[1]?.phoneNumber || '',
-                    contact3Phone: data.contacts?.[2]?.phoneNumber || ''
+                    contact3Phone: data.contacts?.[2]?.phoneNumber || '',
+                    totalExtensionAmount: data.totalExtensionAmount ?? undefined,
                 };
             }
         } catch (error) {
@@ -301,6 +303,7 @@ export default function UserListTable() {
                                         <TableCell align="right">Contract Amount</TableCell>
                                         <TableCell align="right">Total Amount</TableCell>
                                         <TableCell align="right">Overdue Fee</TableCell>
+                                        <TableCell align="right">Extension Amount</TableCell>
                                         <TableCell align="right">Overdue Days</TableCell>
                                         <TableCell>Repay Time</TableCell>
                                         <TableCell>Stage</TableCell>
@@ -331,6 +334,7 @@ export default function UserListTable() {
                                                 <TableCell align="right">{row.totalAmount}</TableCell>
                                                 <TableCell align="right">{row.repayAmount}</TableCell>
                                                 <TableCell align="right">{row.overdueFee}</TableCell>
+                                                <TableCell align="right">{row.totalExtensionAmount ?? '-'}</TableCell>
                                                 <TableCell align="right">{row.overdueDay}</TableCell>
                                                 <TableCell>{row.repayTime}</TableCell>
                                                 <TableCell>{row.stageName}</TableCell>
@@ -341,7 +345,7 @@ export default function UserListTable() {
                                     })}
                                     {filteredRows.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={14} align="center">
+                                            <TableCell colSpan={15} align="center">
                                                 No data available
                                             </TableCell>
                                         </TableRow>
