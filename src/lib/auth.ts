@@ -187,6 +187,12 @@ export const sessionStore: SessionStore = createSessionStore();
 // ============================================================
 
 export async function createSession(userId: string, ip: string, userAgent: string): Promise<SessionInfo> {
+    // If a session already exists, the existing user is being kicked — log it
+    const existing = await sessionStore.get(userId);
+    if (existing) {
+        await logKickEvent(userId);
+    }
+
     const session: SessionInfo = {
         sessionId: randomBytes(32).toString('hex'),
         userId,
@@ -208,6 +214,68 @@ export async function destroySession(userId: string): Promise<void> {
 }
 
 // ============================================================
+// Login History & Kick Tracking
+// ============================================================
+
+export interface LoginEvent {
+    timestamp: number;
+    ip: string;
+    userAgent: string;
+    success: boolean;
+}
+
+const LOG_KEY = (u: string) => `loginlog:${u}`;
+const KICK_KEY = (u: string) => `kicklog:${u}`;
+const MAX_LOG_ENTRIES = 20;
+const MAX_KICK_ENTRIES = 50;
+
+// In-memory fallbacks for login/kick logs when Redis is unavailable
+const inMemoryLoginLogs = new Map<string, LoginEvent[]>();
+const inMemoryKickLogs = new Map<string, number[]>();
+
+export async function logLoginEvent(username: string, ip: string, userAgent: string, success: boolean): Promise<void> {
+    const event: LoginEvent = { timestamp: Date.now(), ip, userAgent, success };
+    const redis = getUserRedis();
+    if (redis) {
+        const existing = await redis.get<LoginEvent[]>(LOG_KEY(username)) || [];
+        const updated = [event, ...existing].slice(0, MAX_LOG_ENTRIES);
+        await redis.set(LOG_KEY(username), updated);
+    } else {
+        const existing = inMemoryLoginLogs.get(username) || [];
+        inMemoryLoginLogs.set(username, [event, ...existing].slice(0, MAX_LOG_ENTRIES));
+    }
+}
+
+export async function getLoginHistory(username: string): Promise<LoginEvent[]> {
+    const redis = getUserRedis();
+    if (redis) {
+        return await redis.get<LoginEvent[]>(LOG_KEY(username)) || [];
+    }
+    return inMemoryLoginLogs.get(username) || [];
+}
+
+export async function logKickEvent(username: string): Promise<void> {
+    const now = Date.now();
+    const redis = getUserRedis();
+    if (redis) {
+        const existing = await redis.get<number[]>(KICK_KEY(username)) || [];
+        const updated = [now, ...existing].slice(0, MAX_KICK_ENTRIES);
+        await redis.set(KICK_KEY(username), updated);
+    } else {
+        const existing = inMemoryKickLogs.get(username) || [];
+        inMemoryKickLogs.set(username, [now, ...existing].slice(0, MAX_KICK_ENTRIES));
+    }
+}
+
+export async function getKickHistory(username: string): Promise<number[]> {
+    const redis = getUserRedis();
+    if (redis) {
+        return await redis.get<number[]>(KICK_KEY(username)) || [];
+    }
+    return inMemoryKickLogs.get(username) || [];
+}
+
+// ============================================================
 // User Store (Redis-backed with USERS_CONFIG env var fallback)
 // ============================================================
 
@@ -219,6 +287,7 @@ export interface UserConfig {
     role: UserRole;
     createdAt?: number;
     createdBy?: string;
+    blocked?: boolean;
 }
 
 // Get a Redis client for user storage (reuse session store's Redis if available)
@@ -421,6 +490,21 @@ export function authenticateUser(username: string, password: string): UserConfig
 export async function authenticateUserAsync(username: string, password: string): Promise<UserConfig | null> {
     const user = await findUserAsync(username);
     if (!user) return null;
+    if (user.blocked) return null;
     if (!verifyPassword(password, user.passwordHash)) return null;
     return user;
+}
+
+export async function setUserBlocked(username: string, blocked: boolean): Promise<void> {
+    const redis = getUserRedis();
+    if (!redis) {
+        throw new Error('Redis is required for user management.');
+    }
+
+    const user = await redis.get<UserConfig>(userKey(username));
+    if (!user) {
+        throw new Error(`User "${username}" not found`);
+    }
+
+    await redis.set(userKey(username), { ...user, blocked });
 }

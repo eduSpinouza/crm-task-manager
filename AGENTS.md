@@ -33,7 +33,8 @@ src/
 │   ├── FollowUpDialog.tsx      # Dialog for submitting follow-ups
 │   ├── EmailDialog.tsx         # Dialog for composing/sending emails
 │   ├── TokenSettings.tsx       # Settings: API token + email config (tabbed)
-│   └── UserManagementDialog.tsx # Admin: user CRUD dialog
+│   ├── UserManagementDialog.tsx # Admin: user CRUD dialog
+│   └── SecurityPanel.tsx       # Admin: security monitor (login/kick history, block/unblock)
 ├── lib/
 │   ├── auth.ts                 # Auth: hashing, JWT, session store, user CRUD
 │   ├── __tests__/auth.test.ts  # Vitest regression tests (26 tests)
@@ -75,8 +76,9 @@ src/
 ### Admin API Routes
 | Route | Method | Purpose |
 |-------|--------|---------|
-| `/api/admin/users` | GET | List all users (admin only) |
+| `/api/admin/users` | GET | List all users + security data (admin only) |
 | `/api/admin/users` | POST | Create user (admin only) |
+| `/api/admin/users` | PATCH | Block/unblock user (admin only) |
 | `/api/admin/users` | DELETE | Delete user (admin only) |
 | `/api/admin/seed` | POST | Seed users from `USERS_CONFIG` to Redis |
 
@@ -304,6 +306,7 @@ Errors are learning opportunities. When something breaks:
 - **Vitest testing**: 26 regression tests for auth, JWT, sessions, user store
 - **Login page**: POST auth, httpOnly cookie, Suspense boundary, licensing warning
 - **Dashboard**: Session polling every 30s, kicked-user redirect, admin panel
+- **Security Monitor**: Login event log (max 20, `loginlog:{user}` Redis key), session kick log (max 50, `kicklog:{user}`), `blocked` field on `UserConfig`, PATCH /api/admin/users for block/unblock, SecurityPanel component with suspicious detection (2+ IPs in 24h or 3+ kicks in 7d), Security Monitor tab in dashboard (admin only)
 
 ## Testing
 ```bash

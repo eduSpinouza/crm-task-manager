@@ -1,19 +1,23 @@
 'use client';
 
 import * as React from 'react';
-import { Box, AppBar, Toolbar, Typography, Button, Container, Alert, Snackbar } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, Button, Container, Alert, Snackbar, Tabs, Tab } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
+import SecurityIcon from '@mui/icons-material/Security';
 import { useRouter } from 'next/navigation';
 import axios from 'axios';
 import TokenSettings from '@/components/TokenSettings';
 import UserListTable from '@/components/UserListTable';
 import UserManagementDialog from '@/components/UserManagementDialog';
+import SecurityPanel from '@/components/SecurityPanel';
 
 export default function DashboardPage() {
     const router = useRouter();
     const [sessionAlert, setSessionAlert] = React.useState('');
     const [userRole, setUserRole] = React.useState<string>('user');
+    const [currentUsername, setCurrentUsername] = React.useState<string>('');
     const [usersDialogOpen, setUsersDialogOpen] = React.useState(false);
+    const [currentTab, setCurrentTab] = React.useState<'crm' | 'security'>('crm');
 
     // Verify session on mount
     React.useEffect(() => {
@@ -32,8 +36,9 @@ export default function DashboardPage() {
             if (!response.data?.valid) {
                 handleSessionExpired(response.data?.message);
             } else {
-                // Store role from session check
+                // Store role and username from session check
                 setUserRole(response.data.user?.role || 'user');
+                setCurrentUsername(response.data.user?.name || '');
             }
         } catch (err: any) {
             if (err.response?.status === 401) {
@@ -84,8 +89,25 @@ export default function DashboardPage() {
                     <Button color="inherit" onClick={handleLogout}>Logout</Button>
                 </Toolbar>
             </AppBar>
+            {userRole === 'admin' && (
+                <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper' }}>
+                    <Tabs
+                        value={currentTab}
+                        onChange={(_, v) => setCurrentTab(v)}
+                        sx={{ px: 3 }}
+                    >
+                        <Tab label="CRM Tasks" value="crm" />
+                        <Tab label="Security Monitor" value="security" icon={<SecurityIcon fontSize="small" />} iconPosition="start" />
+                    </Tabs>
+                </Box>
+            )}
+
             <Container maxWidth="xl" sx={{ mt: 4 }}>
-                <UserListTable />
+                {currentTab === 'crm' || userRole !== 'admin' ? (
+                    <UserListTable />
+                ) : (
+                    <SecurityPanel currentUser={currentUsername} />
+                )}
             </Container>
 
             <UserManagementDialog

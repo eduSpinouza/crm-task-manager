@@ -8,8 +8,14 @@ import {
     validateSession,
     destroySession,
     authenticateUser,
+    authenticateUserAsync,
     findUser,
     getUsers,
+    logLoginEvent,
+    getLoginHistory,
+    logKickEvent,
+    getKickHistory,
+    setUserBlocked,
 } from '../auth';
 
 // ============================================================
@@ -233,5 +239,163 @@ describe('User Store', () => {
         expect(getUsers()).toEqual([]);
 
         process.env.USERS_CONFIG = saved;
+    });
+});
+
+// ============================================================
+// Login History (in-memory fallback — no Redis env vars in tests)
+// ============================================================
+describe('Login History', () => {
+    const testUser = `logintest-${Date.now()}`;
+
+    it('logLoginEvent stores events, getLoginHistory returns newest-first', async () => {
+        await logLoginEvent(testUser, '1.1.1.1', 'AgentA', true);
+        await logLoginEvent(testUser, '2.2.2.2', 'AgentB', false);
+
+        const history = await getLoginHistory(testUser);
+        expect(history.length).toBe(2);
+        // Newest first
+        expect(history[0].ip).toBe('2.2.2.2');
+        expect(history[0].success).toBe(false);
+        expect(history[1].ip).toBe('1.1.1.1');
+        expect(history[1].success).toBe(true);
+    });
+
+    it('logLoginEvent caps history at 20 entries', async () => {
+        const capUser = `captest-${Date.now()}`;
+        for (let i = 0; i < 25; i++) {
+            await logLoginEvent(capUser, `10.0.0.${i}`, 'Bot', true);
+        }
+        const history = await getLoginHistory(capUser);
+        expect(history.length).toBe(20);
+        // Most recent entry (last logged) should be first
+        expect(history[0].ip).toBe('10.0.0.24');
+    });
+
+    it('getLoginHistory returns empty array for unknown user', async () => {
+        const history = await getLoginHistory('no-such-user-xyz');
+        expect(history).toEqual([]);
+    });
+});
+
+// ============================================================
+// Kick Tracking (in-memory fallback)
+// ============================================================
+describe('Kick Tracking', () => {
+    it('logKickEvent stores timestamps, getKickHistory returns newest-first', async () => {
+        const kickUser = `kicktest-${Date.now()}`;
+
+        const before = Date.now();
+        await logKickEvent(kickUser);
+        await logKickEvent(kickUser);
+        const after = Date.now();
+
+        const kicks = await getKickHistory(kickUser);
+        expect(kicks.length).toBe(2);
+        // Newest first: both timestamps should be in range
+        expect(kicks[0]).toBeGreaterThanOrEqual(before);
+        expect(kicks[0]).toBeLessThanOrEqual(after);
+        expect(kicks[1]).toBeLessThanOrEqual(kicks[0]);
+    });
+
+    it('logKickEvent caps history at 50 entries', async () => {
+        const capUser = `kickcap-${Date.now()}`;
+        for (let i = 0; i < 55; i++) {
+            await logKickEvent(capUser);
+        }
+        const kicks = await getKickHistory(capUser);
+        expect(kicks.length).toBe(50);
+    });
+
+    it('getKickHistory returns empty array for unknown user', async () => {
+        const kicks = await getKickHistory('no-such-user-xyz2');
+        expect(kicks).toEqual([]);
+    });
+});
+
+// ============================================================
+// createSession kick integration
+// ============================================================
+describe('createSession — kick tracking', () => {
+    it('createSession over existing session increments kick count', async () => {
+        const kickIntegUser = `kick-integ-${Date.now()}`;
+        // First session — no existing session, no kick
+        await createSession(kickIntegUser, '1.1.1.1', 'Device1');
+        const kicksAfterFirst = await getKickHistory(kickIntegUser);
+        expect(kicksAfterFirst.length).toBe(0);
+
+        // Second session — existing session found, kick logged
+        await createSession(kickIntegUser, '2.2.2.2', 'Device2');
+        const kicksAfterSecond = await getKickHistory(kickIntegUser);
+        expect(kicksAfterSecond.length).toBe(1);
+
+        // Third session — kick logged again
+        await createSession(kickIntegUser, '3.3.3.3', 'Device3');
+        const kicksAfterThird = await getKickHistory(kickIntegUser);
+        expect(kicksAfterThird.length).toBe(2);
+    });
+
+    it('createSession without pre-existing session does NOT log a kick', async () => {
+        const freshUser = `fresh-${Date.now()}`;
+        await createSession(freshUser, '5.5.5.5', 'FreshDevice');
+        const kicks = await getKickHistory(freshUser);
+        expect(kicks.length).toBe(0);
+    });
+});
+
+// ============================================================
+// Blocked user (authenticateUserAsync + setUserBlocked)
+// Uses in-memory via USERS_CONFIG env var (no Redis in tests)
+// ============================================================
+describe('Blocked user', () => {
+    const blockedUsername = 'blockable';
+    const blockedPassword = 'correctpass';
+
+    beforeAll(() => {
+        // Add blockable user to USERS_CONFIG
+        const existing = JSON.parse(process.env.USERS_CONFIG || '[]');
+        process.env.USERS_CONFIG = JSON.stringify([
+            ...existing,
+            { username: blockedUsername, passwordHash: hashPassword(blockedPassword), role: 'user' },
+        ]);
+    });
+
+    it('authenticateUserAsync succeeds with correct credentials when not blocked', async () => {
+        const user = await authenticateUserAsync(blockedUsername, blockedPassword);
+        expect(user).not.toBeNull();
+        expect(user!.username).toBe(blockedUsername);
+    });
+
+    it('authenticateUserAsync returns null for wrong password', async () => {
+        const user = await authenticateUserAsync(blockedUsername, 'wrongpass');
+        expect(user).toBeNull();
+    });
+
+    it('authenticateUserAsync returns null for unknown user', async () => {
+        const user = await authenticateUserAsync('ghost99', 'anypass');
+        expect(user).toBeNull();
+    });
+
+    it('authenticateUserAsync returns null for blocked user (correct password)', async () => {
+        // Directly mark as blocked in USERS_CONFIG (simulate blocked field)
+        const existing = JSON.parse(process.env.USERS_CONFIG || '[]');
+        const updated = existing.map((u: any) =>
+            u.username === blockedUsername ? { ...u, blocked: true } : u
+        );
+        process.env.USERS_CONFIG = JSON.stringify(updated);
+
+        const user = await authenticateUserAsync(blockedUsername, blockedPassword);
+        expect(user).toBeNull();
+
+        // Restore
+        const restored = updated.map((u: any) =>
+            u.username === blockedUsername ? { ...u, blocked: false } : u
+        );
+        process.env.USERS_CONFIG = JSON.stringify(restored);
+    });
+
+    it('setUserBlocked requires Redis (throws without Redis env vars)', async () => {
+        // No Redis env vars in test environment — should throw
+        await expect(setUserBlocked(blockedUsername, true)).rejects.toThrow('Redis is required');
     });
 });

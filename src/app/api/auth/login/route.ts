@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { authenticateUserAsync, createSession, signJWT } from '@/lib/auth';
+import { authenticateUserAsync, createSession, signJWT, logLoginEvent } from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
     try {
@@ -10,15 +10,19 @@ export async function POST(request: NextRequest) {
             return NextResponse.json({ error: 'Username and password are required' }, { status: 400 });
         }
 
-        // Authenticate against Redis first, then USERS_CONFIG fallback
-        const user = await authenticateUserAsync(username, password);
-        if (!user) {
-            return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
-        }
-
         // Get client info
         const ip = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || 'unknown';
         const userAgent = request.headers.get('user-agent') || 'unknown';
+
+        // Authenticate against Redis first, then USERS_CONFIG fallback
+        const user = await authenticateUserAsync(username, password);
+        if (!user) {
+            await logLoginEvent(username, ip, userAgent, false);
+            return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+        }
+
+        // Log successful login before creating session
+        await logLoginEvent(user.username, ip, userAgent, true);
 
         // Create session (invalidates any previous session for this user)
         const session = await createSession(user.username, ip, userAgent);

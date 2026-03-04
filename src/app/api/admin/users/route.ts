@@ -1,5 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyJWT, listUsersAsync, createUser, deleteUserAsync, type UserRole } from '@/lib/auth';
+import {
+    verifyJWT, listUsersAsync, createUser, deleteUserAsync, setUserBlocked,
+    getLoginHistory, getKickHistory, sessionStore, destroySession, type UserRole,
+} from '@/lib/auth';
 
 // Helper to verify admin role from JWT
 function getAdminPayload(request: NextRequest) {
@@ -22,12 +25,23 @@ export async function GET(request: NextRequest) {
     try {
         const users = await listUsersAsync();
 
-        // Strip password hashes from response
-        const safeUsers = users.map(u => ({
-            username: u.username,
-            role: u.role,
-            createdAt: u.createdAt,
-            createdBy: u.createdBy,
+        // Enrich each user with session info and security logs
+        const safeUsers = await Promise.all(users.map(async u => {
+            const [currentSession, loginHistory, kickHistory] = await Promise.all([
+                sessionStore.get(u.username),
+                getLoginHistory(u.username),
+                getKickHistory(u.username),
+            ]);
+            return {
+                username: u.username,
+                role: u.role,
+                createdAt: u.createdAt,
+                createdBy: u.createdBy,
+                blocked: u.blocked ?? false,
+                currentSession: currentSession ?? null,
+                loginHistory,
+                kickHistory,
+            };
         }));
 
         return NextResponse.json({ success: true, users: safeUsers });
@@ -117,5 +131,46 @@ export async function DELETE(request: NextRequest) {
         }
 
         return NextResponse.json({ error: 'Failed to delete user' }, { status: 500 });
+    }
+}
+
+// PATCH — Block or unblock a user (admin only)
+export async function PATCH(request: NextRequest) {
+    const admin = getAdminPayload(request);
+    if (!admin) {
+        return NextResponse.json({ error: 'Admin access required' }, { status: 403 });
+    }
+
+    try {
+        const body = await request.json();
+        const { username, blocked } = body;
+
+        if (!username || typeof blocked !== 'boolean') {
+            return NextResponse.json({ error: 'username and blocked (boolean) are required' }, { status: 400 });
+        }
+
+        if (username === admin.userId) {
+            return NextResponse.json({ error: 'Cannot block your own account' }, { status: 400 });
+        }
+
+        await setUserBlocked(username, blocked);
+
+        // When blocking, immediately destroy their active session
+        if (blocked) {
+            await destroySession(username);
+        }
+
+        return NextResponse.json({ success: true, message: `User "${username}" ${blocked ? 'blocked' : 'unblocked'}` });
+    } catch (error: any) {
+        console.error('Block/unblock user error:', error.message);
+
+        if (error.message.includes('not found')) {
+            return NextResponse.json({ error: error.message }, { status: 404 });
+        }
+        if (error.message.includes('Redis is required')) {
+            return NextResponse.json({ error: 'User management requires Redis.' }, { status: 503 });
+        }
+
+        return NextResponse.json({ error: 'Failed to update user' }, { status: 500 });
     }
 }

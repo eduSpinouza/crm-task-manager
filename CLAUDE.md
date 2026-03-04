@@ -2,6 +2,14 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Project context
+
+Read **`AGENTS.md`** before making any decisions. It is the primary onboarding document and contains: full project overview, authentication flow, external API details, data structures, email feature architecture, table features, environment variables, and important constraints. Keep it up to date whenever a new feature is added.
+
+## Testing rule
+
+**Every new feature or bug fix must include Vitest unit tests.** Place them in `src/lib/__tests__/`. If new logic lives in a file that isn't directly testable (e.g. a Next.js route), extract it into a utility module under `src/lib/` first (as was done with `src/lib/phoneUtils.ts`), then test the utility. Run the full suite before committing — all tests must pass.
+
 ## Commands
 
 ```bash
@@ -15,13 +23,13 @@ nvs exec node/24.13.0/x64 npm run build
 npm run lint
 
 # Run all tests
-nvs exec node/24.13.0/x64 npx vitest run
+nvs exec node/24.13.0/x64 npx.cmd vitest run
 
 # Run a single test file
-nvs exec node/24.13.0/x64 npx vitest run src/lib/__tests__/auth.test.ts
+nvs exec node/24.13.0/x64 npx.cmd vitest run src/lib/__tests__/auth.test.ts
 ```
 
-> On Windows PowerShell, use `;` not `&&` to chain commands.
+> On Windows PowerShell, use `;` not `&&` to chain commands. When invoking from Claude Code (bash shell), prefix with `powershell.exe -Command "cd 'C:\Users\CoCo Dev\Documents\Workspace\AndrecoProject'; nvs exec node/24.13.0/x64 npx.cmd vitest run"`.
 
 ## Architecture
 
@@ -68,4 +76,7 @@ Vercel auto-deploys from the `master` branch of `eduSpinouza/crm-task-manager`. 
 
 ### Test Coverage
 
-Vitest tests in `src/lib/__tests__/auth.test.ts` cover: password hashing, JWT sign/verify, session lifecycle, single-session enforcement, and user store loading from env vars (26 tests total).
+| File | Tests | Covers |
+|------|-------|--------|
+| `src/lib/__tests__/auth.test.ts` | 26 | Password hashing, JWT sign/verify, session lifecycle, single-session enforcement, user store |
+| `src/lib/__tests__/phoneUtils.test.ts` | 30 | Country config inference from base URL, `cleanPhoneNumber` for all 4 countries (mx/pe/co/cl), edge cases |
