@@ -9,7 +9,10 @@ import {
 import axios from 'axios';
 import FollowUpDialog from './FollowUpDialog';
 import EmailDialog from './EmailDialog';
+import DebtorDetailDialog from './DebtorDetailDialog';
 import Snackbar from '@mui/material/Snackbar';
+import VisibilityIcon from '@mui/icons-material/Visibility';
+import IconButton from '@mui/material/IconButton';
 
 interface UserData {
     taskId: number;
@@ -48,6 +51,7 @@ export default function UserListTable() {
     const [hasToken, setHasToken] = React.useState(false);
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = React.useState(false);
+    const [detailUser, setDetailUser] = React.useState<UserData | null>(null);
     const [snackbar, setSnackbar] = React.useState<{ open: boolean, message: string, severity: 'success' | 'error' } | null>(null);
     // Filters
     const [filterAppName, setFilterAppName] = React.useState<string>('');
@@ -309,6 +313,7 @@ export default function UserListTable() {
                                         <TableCell>Stage</TableCell>
                                         <TableCell>Result</TableCell>
                                         <TableCell>Note</TableCell>
+                                        <TableCell padding="checkbox" />
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -340,12 +345,21 @@ export default function UserListTable() {
                                                 <TableCell>{row.stageName}</TableCell>
                                                 <TableCell>{row.followResult}</TableCell>
                                                 <TableCell>{row.note}</TableCell>
+                                                <TableCell padding="checkbox">
+                                                    <IconButton
+                                                        size="small"
+                                                        title="View detail"
+                                                        onClick={e => { e.stopPropagation(); setDetailUser(row); }}
+                                                    >
+                                                        <VisibilityIcon fontSize="small" />
+                                                    </IconButton>
+                                                </TableCell>
                                             </TableRow>
                                         );
                                     })}
                                     {filteredRows.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={15} align="center">
+                                            <TableCell colSpan={16} align="center">
                                                 No data available
                                             </TableCell>
                                         </TableRow>
@@ -380,6 +394,14 @@ export default function UserListTable() {
                 }))}
                 onSuccess={handleFollowUpSuccess}
             />
+
+            {detailUser && (
+                <DebtorDetailDialog
+                    open={!!detailUser}
+                    onClose={() => setDetailUser(null)}
+                    user={detailUser}
+                />
+            )}
 
             <EmailDialog
                 open={isEmailDialogOpen}

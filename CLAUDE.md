@@ -86,3 +86,4 @@ Vercel auto-deploys from the `master` branch of `eduSpinouza/crm-task-manager`. 
 | `src/lib/__tests__/auth.test.ts` | 39 | Password hashing, JWT sign/verify, session lifecycle, single-session enforcement, user store |
 | `src/lib/__tests__/phoneUtils.test.ts` | 30 | Country config inference from base URL, `cleanPhoneNumber` for all 4 countries (mx/pe/co/cl), edge cases |
 | `src/lib/__tests__/emailService.test.ts` | 6 | `EmailService` placeholder replacement including `{{extensionAmount}}`, edge cases (undefined, 0, multiple occurrences, subject line) |
+| `src/lib/__tests__/templateUtils.test.ts` | 22 | Shared `replacePlaceholders` — text mode (all tokens, edge cases) and html mode (img tags, br conversion) |

@@ -1,5 +1,6 @@
 import { EmailProvider, EmailSendResult } from './EmailProvider';
 import { GmailProvider } from './providers/GmailProvider';
+import { replacePlaceholders } from '../templateUtils';
 
 export interface UserData {
     email: string;
@@ -37,44 +38,14 @@ export class EmailService {
         }
     }
 
-    // Replace placeholders in template with user data
-    private replacePlaceholders(template: string, user: UserData): string {
-        let result = template;
-        const placeholders: Record<string, string> = {
-            '{{userName}}': user.userName || '',
-            '{{email}}': user.email || '',
-            '{{phone}}': user.phone || '',
-            '{{appName}}': user.appName || '',
-            '{{productName}}': user.productName || '',
-            '{{principal}}': String(user.principal || ''),
-            '{{contractAmount}}': String(user.totalAmount || ''),
-            '{{totalAmount}}': String(user.repayAmount || ''),
-            '{{overdueFee}}': String(user.overdueFee || ''),
-            '{{extensionAmount}}': String(user.totalExtensionAmount ?? ''),
-            '{{repayTime}}': user.repayTime || '',
-            '{{stageName}}': user.stageName || '',
-            '{{idNoUrl}}': user.idNoUrl ? `<img src="${user.idNoUrl}" width="200" style="max-width:100%;" />` : '',
-            '{{livingNessUrl}}': user.livingNessUrl ? `<img src="${user.livingNessUrl}" width="200" style="max-width:100%;" />` : '',
-        };
-
-        for (const [placeholder, value] of Object.entries(placeholders)) {
-            result = result.replace(new RegExp(placeholder, 'g'), value);
-        }
-
-        // Convert newlines to HTML <br> tags so line breaks are preserved
-        result = result.replace(/\n/g, '<br>\n');
-
-        return result;
-    }
-
     // Send email to a single user with placeholder replacement
     async sendToUser(
         user: UserData,
         subjectTemplate: string,
         bodyTemplate: string
     ): Promise<EmailSendResult> {
-        const subject = this.replacePlaceholders(subjectTemplate, user);
-        const body = this.replacePlaceholders(bodyTemplate, user);
+        const subject = replacePlaceholders(subjectTemplate, user, 'html');
+        const body = replacePlaceholders(bodyTemplate, user, 'html');
 
         return this.provider.send(user.email, subject, body);
     }
