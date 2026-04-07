@@ -38,6 +38,7 @@ interface UserData {
     stageName: string;
     idNoUrl?: string;
     livingNessUrl?: string;
+    totalExtensionAmount?: number;
     [key: string]: any;
 }
 
@@ -162,6 +163,7 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
         preview = preview.replace(/\{\{contractAmount\}\}/g, String((user as any).totalAmount || ''));
         preview = preview.replace(/\{\{totalAmount\}\}/g, String((user as any).repayAmount || ''));
         preview = preview.replace(/\{\{overdueFee\}\}/g, String((user as any).overdueFee || ''));
+        preview = preview.replace(/\{\{extensionAmount\}\}/g, String(user.totalExtensionAmount ?? ''));
         preview = preview.replace(/\{\{repayTime\}\}/g, user.repayTime || '');
         preview = preview.replace(/\{\{stageName\}\}/g, user.stageName || '');
         preview = preview.replace(/\{\{idNoUrl\}\}/g, user.idNoUrl ? `<img src="${user.idNoUrl}" width="200" />` : '');
@@ -202,7 +204,7 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
                         <Typography variant="caption" color="textSecondary" component="div">
                             <strong>Text:</strong> {"{{userName}}"}, {"{{email}}"}, {"{{phone}}"}, {"{{appName}}"}, {"{{productName}}"}, {"{{repayTime}}"}, {"{{stageName}}"}
                             <br />
-                            <strong>Amounts:</strong> {"{{contractAmount}}"}, {"{{totalAmount}}"}, {"{{overdueFee}}"}
+                            <strong>Amounts:</strong> {"{{contractAmount}}"}, {"{{totalAmount}}"}, {"{{overdueFee}}"}, {"{{extensionAmount}}"}
                             <br />
                             <strong>Images:</strong> {"{{idNoUrl}}"} - automatically embeds user ID photo
                         </Typography>

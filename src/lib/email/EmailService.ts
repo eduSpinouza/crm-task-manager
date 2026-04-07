@@ -9,6 +9,7 @@ export interface UserData {
     principal: number;
     repayTime: string;
     stageName: string;
+    totalExtensionAmount?: number;
     [key: string]: any;
 }
 
@@ -49,6 +50,7 @@ export class EmailService {
             '{{contractAmount}}': String(user.totalAmount || ''),
             '{{totalAmount}}': String(user.repayAmount || ''),
             '{{overdueFee}}': String(user.overdueFee || ''),
+            '{{extensionAmount}}': String(user.totalExtensionAmount ?? ''),
             '{{repayTime}}': user.repayTime || '',
             '{{stageName}}': user.stageName || '',
             '{{idNoUrl}}': user.idNoUrl ? `<img src="${user.idNoUrl}" width="200" style="max-width:100%;" />` : '',

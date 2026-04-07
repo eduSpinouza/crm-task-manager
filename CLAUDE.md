@@ -10,6 +10,11 @@ Read **`AGENTS.md`** before making any decisions. It is the primary onboarding d
 
 **Every new feature or bug fix must include Vitest unit tests.** Place them in `src/lib/__tests__/`. If new logic lives in a file that isn't directly testable (e.g. a Next.js route), extract it into a utility module under `src/lib/` first (as was done with `src/lib/phoneUtils.ts`), then test the utility. Run the full suite before committing — all tests must pass.
 
+**After adding any feature**, always:
+1. Run the full test suite and confirm all tests pass.
+2. Check that the new functionality has test coverage. If tests are missing, add them. If existing tests are broken by the change, fix them before moving on.
+3. Do not consider a feature done until the full suite is green.
+
 ## Commands
 
 ```bash
@@ -78,5 +83,6 @@ Vercel auto-deploys from the `master` branch of `eduSpinouza/crm-task-manager`. 
 
 | File | Tests | Covers |
 |------|-------|--------|
-| `src/lib/__tests__/auth.test.ts` | 26 | Password hashing, JWT sign/verify, session lifecycle, single-session enforcement, user store |
+| `src/lib/__tests__/auth.test.ts` | 39 | Password hashing, JWT sign/verify, session lifecycle, single-session enforcement, user store |
 | `src/lib/__tests__/phoneUtils.test.ts` | 30 | Country config inference from base URL, `cleanPhoneNumber` for all 4 countries (mx/pe/co/cl), edge cases |
+| `src/lib/__tests__/emailService.test.ts` | 6 | `EmailService` placeholder replacement including `{{extensionAmount}}`, edge cases (undefined, 0, multiple occurrences, subject line) |
