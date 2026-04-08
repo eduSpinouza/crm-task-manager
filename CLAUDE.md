@@ -79,6 +79,10 @@ This interface exists in three places and must stay compatible:
 
 Vercel auto-deploys from the `master` branch of `eduSpinouza/crm-task-manager`. Always run `npm run build` locally before pushing.
 
+## Commit style
+
+Do **not** add `Co-Authored-By` trailers to commits.
+
 ### Test Coverage
 
 | File | Tests | Covers |

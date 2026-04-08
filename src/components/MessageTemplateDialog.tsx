@@ -13,7 +13,6 @@ import {
     Card,
     CardContent,
     IconButton,
-    Collapse,
     Tooltip,
     Snackbar,
     Alert,
@@ -21,10 +20,12 @@ import {
 } from '@mui/material';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import WhatsAppIcon from '@mui/icons-material/WhatsApp';
-import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
-import ExpandLessIcon from '@mui/icons-material/ExpandLess';
+import SendIcon from '@mui/icons-material/Send';
 import DeleteIcon from '@mui/icons-material/Delete';
 import AddIcon from '@mui/icons-material/Add';
+import EditIcon from '@mui/icons-material/Edit';
+import SettingsIcon from '@mui/icons-material/Settings';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { replacePlaceholders, TemplateUser } from '@/lib/templateUtils';
 
 interface MessageTemplate {
@@ -47,16 +48,16 @@ const STORAGE_KEY = 'whatsapp_templates';
 
 const DEFAULT_TEMPLATES: MessageTemplate[] = [
     {
-        name: 'Payment Reminder',
-        body: 'Hello {{userName}}, we are contacting you regarding your outstanding balance of ${{overdueFee}} for {{productName}}. Your repayment deadline is {{repayTime}}. Please contact us to arrange payment. Thank you.',
+        name: 'Recordatorio de pago',
+        body: 'Hola {{userName}}, nos comunicamos con usted respecto a su saldo pendiente de ${{overdueFee}} por el producto {{productName}}. Su fecha límite de pago es {{repayTime}}. Por favor contáctenos para coordinar el pago. Gracias.',
     },
     {
-        name: 'Urgent Notice',
-        body: 'URGENT: {{userName}}, your account has been overdue for {{overdueDay}} days. Total amount due: ${{totalAmount}}. Please make payment immediately to avoid further fees.',
+        name: 'Aviso urgente',
+        body: 'URGENTE: {{userName}}, su cuenta lleva {{overdueDay}} días de mora. Monto total a pagar: ${{totalAmount}}. Le solicitamos realizar el pago de inmediato para evitar cargos adicionales.',
     },
     {
-        name: 'Payment Plan',
-        body: 'Hello {{userName}}, we would like to offer you a payment arrangement for your balance of ${{overdueFee}}. Please reply to this message so we can discuss options. {{appName}} Collections.',
+        name: 'Plan de pagos',
+        body: 'Hola {{userName}}, queremos ofrecerle un plan de pago para su saldo de ${{overdueFee}}. Por favor responda este mensaje para que podamos analizar las opciones disponibles. Cobranzas {{appName}}.',
     },
 ];
 
@@ -73,9 +74,10 @@ export default function MessageTemplateDialog({
     contactLabel = 'Contact',
 }: MessageTemplateDialogProps) {
     const [templates, setTemplates] = useState<MessageTemplate[]>([]);
-    const [manageOpen, setManageOpen] = useState(false);
+    const [manageMode, setManageMode] = useState(false);
     const [newName, setNewName] = useState('');
     const [newBody, setNewBody] = useState('');
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
     const [snackbar, setSnackbar] = useState<{ open: boolean; message: string }>({ open: false, message: '' });
 
     useEffect(() => {
@@ -98,12 +100,33 @@ export default function MessageTemplateDialog({
 
     const handleAddTemplate = () => {
         if (!newName.trim() || !newBody.trim()) return;
-        persist([...templates, { name: newName.trim(), body: newBody.trim() }]);
+        if (editingIndex !== null) {
+            const updated = templates.map((t, i) =>
+                i === editingIndex ? { name: newName.trim(), body: newBody.trim() } : t
+            );
+            persist(updated);
+            setEditingIndex(null);
+        } else {
+            persist([...templates, { name: newName.trim(), body: newBody.trim() }]);
+        }
+        setNewName('');
+        setNewBody('');
+    };
+
+    const handleEditTemplate = (index: number) => {
+        setEditingIndex(index);
+        setNewName(templates[index].name);
+        setNewBody(templates[index].body);
+    };
+
+    const handleCancelEdit = () => {
+        setEditingIndex(null);
         setNewName('');
         setNewBody('');
     };
 
     const handleDeleteTemplate = (index: number) => {
+        if (editingIndex === index) handleCancelEdit();
         persist(templates.filter((_, i) => i !== index));
     };
 
@@ -125,97 +148,75 @@ export default function MessageTemplateDialog({
         window.open(`https://wa.me/${cleanPhone}?text=${message}`, '_blank', 'noopener,noreferrer');
     };
 
+    const handleTelegram = async (body: string) => {
+        try {
+            await navigator.clipboard.writeText(rendered(body));
+        } catch { /* ignore */ }
+        const cleanPhone = cleanPhoneForWhatsapp(phone);
+        window.open(`https://t.me/+${cleanPhone}`, '_blank', 'noopener,noreferrer');
+        setSnackbar({ open: true, message: 'Message copied — paste it in the Telegram chat.' });
+    };
+
     return (
         <>
             <Dialog open={open} onClose={onClose} maxWidth="sm" fullWidth>
-                <DialogTitle>
-                    Message — {contactLabel}: {phone}
+                <DialogTitle sx={{ display: 'flex', alignItems: 'center' }}>
+                    <Box sx={{ flex: 1 }}>
+                        {manageMode ? 'Manage Templates' : `Message — ${contactLabel}: ${phone}`}
+                    </Box>
+                    <Button
+                        size="small"
+                        variant={manageMode ? 'text' : 'outlined'}
+                        startIcon={manageMode ? <ArrowBackIcon /> : <SettingsIcon />}
+                        onClick={() => { setManageMode(v => !v); handleCancelEdit(); }}
+                    >
+                        {manageMode ? 'Back' : 'Manage'}
+                    </Button>
                 </DialogTitle>
 
                 <DialogContent dividers>
-                    {/* Template cards */}
-                    {templates.map((t, i) => (
-                        <Card key={i} variant="outlined" sx={{ mb: 2 }}>
-                            <CardContent sx={{ pb: '8px !important' }}>
-                                <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
-                                    {t.name}
-                                </Typography>
-                                <Typography
-                                    variant="body2"
+                    {manageMode ? (
+                        /* ── Manage view ── */
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                            {templates.map((t, i) => (
+                                <Box
+                                    key={i}
                                     sx={{
-                                        whiteSpace: 'pre-wrap',
-                                        bgcolor: 'grey.50',
-                                        p: 1.5,
-                                        borderRadius: 1,
-                                        mb: 1.5,
-                                        fontFamily: 'monospace',
-                                        fontSize: '0.8rem',
+                                        display: 'flex', alignItems: 'center', gap: 1, py: 0.5,
+                                        bgcolor: editingIndex === i ? 'action.selected' : 'transparent',
+                                        borderRadius: 1, px: 0.5,
                                     }}
                                 >
-                                    {rendered(t.body)}
-                                </Typography>
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Tooltip title="Copy to clipboard (Telegram, SMS, etc.)">
-                                        <Button
-                                            size="small"
-                                            variant="outlined"
-                                            startIcon={<ContentCopyIcon />}
-                                            onClick={() => handleCopy(t.body)}
-                                        >
-                                            Copy
-                                        </Button>
+                                    <Typography variant="body2" sx={{ flex: 1 }}>{t.name}</Typography>
+                                    <Tooltip title="Edit">
+                                        <IconButton size="small" onClick={() => handleEditTemplate(i)}>
+                                            <EditIcon fontSize="small" />
+                                        </IconButton>
                                     </Tooltip>
-                                    <Tooltip title="Open WhatsApp with this message pre-filled">
-                                        <Button
-                                            size="small"
-                                            variant="contained"
-                                            color="success"
-                                            startIcon={<WhatsAppIcon />}
-                                            onClick={() => handleWhatsApp(t.body)}
-                                        >
-                                            WhatsApp
-                                        </Button>
+                                    <Tooltip title="Delete">
+                                        <IconButton size="small" color="error" onClick={() => handleDeleteTemplate(i)}>
+                                            <DeleteIcon fontSize="small" />
+                                        </IconButton>
                                     </Tooltip>
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    ))}
-
-                    {templates.length === 0 && (
-                        <Typography color="textSecondary" sx={{ mb: 2 }}>
-                            No templates yet. Add one below.
-                        </Typography>
-                    )}
-
-                    <Divider sx={{ my: 2 }} />
-
-                    {/* Manage templates (collapsible) */}
-                    <Box
-                        sx={{ display: 'flex', alignItems: 'center', cursor: 'pointer', mb: 1 }}
-                        onClick={() => setManageOpen(v => !v)}
-                    >
-                        <Typography variant="body2" fontWeight="bold" sx={{ flex: 1 }}>
-                            Manage Templates
-                        </Typography>
-                        {manageOpen ? <ExpandLessIcon fontSize="small" /> : <ExpandMoreIcon fontSize="small" />}
-                    </Box>
-
-                    <Collapse in={manageOpen}>
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mb: 1 }}>
-                            {templates.map((t, i) => (
-                                <Box key={i} sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                    <Typography variant="body2" sx={{ flex: 1 }}>
-                                        {t.name}
-                                    </Typography>
-                                    <IconButton size="small" onClick={() => handleDeleteTemplate(i)}>
-                                        <DeleteIcon fontSize="small" />
-                                    </IconButton>
                                 </Box>
                             ))}
-                        </Box>
-
-                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1, mt: 2 }}>
-                            <Typography variant="caption" color="textSecondary">
+                            {templates.length === 0 && (
+                                <Typography variant="body2" color="text.secondary">No templates yet.</Typography>
+                            )}
+                            <Divider sx={{ my: 1 }} />
+                            <Button
+                                size="small"
+                                variant="text"
+                                color="warning"
+                                onClick={() => { persist(DEFAULT_TEMPLATES); handleCancelEdit(); }}
+                            >
+                                Reset to defaults
+                            </Button>
+                            <Divider sx={{ mb: 1 }} />
+                            <Typography variant="caption" color="text.secondary" fontWeight="bold">
+                                {editingIndex !== null ? `Editing: ${templates[editingIndex]?.name}` : 'Add new template'}
+                            </Typography>
+                            <Typography variant="caption" color="text.secondary">
                                 Placeholders: {'{{userName}}'}, {'{{phone}}'}, {'{{overdueFee}}'}, {'{{overdueDay}}'}, {'{{totalAmount}}'}, {'{{repayTime}}'}, {'{{productName}}'}, {'{{appName}}'}, {'{{extensionAmount}}'}
                             </Typography>
                             <TextField
@@ -232,16 +233,89 @@ export default function MessageTemplateDialog({
                                 multiline
                                 rows={4}
                             />
-                            <Button
-                                variant="outlined"
-                                startIcon={<AddIcon />}
-                                onClick={handleAddTemplate}
-                                disabled={!newName.trim() || !newBody.trim()}
-                            >
-                                Add Template
-                            </Button>
+                            <Box sx={{ display: 'flex', gap: 1 }}>
+                                <Button
+                                    variant="contained"
+                                    startIcon={editingIndex !== null ? <EditIcon /> : <AddIcon />}
+                                    onClick={handleAddTemplate}
+                                    disabled={!newName.trim() || !newBody.trim()}
+                                >
+                                    {editingIndex !== null ? 'Save Changes' : 'Add Template'}
+                                </Button>
+                                {editingIndex !== null && (
+                                    <Button variant="outlined" onClick={handleCancelEdit}>
+                                        Cancel
+                                    </Button>
+                                )}
+                            </Box>
                         </Box>
-                    </Collapse>
+                    ) : (
+                        /* ── Templates view ── */
+                        <>
+                            {templates.map((t, i) => (
+                                <Card key={i} variant="outlined" sx={{ mb: 2 }}>
+                                    <CardContent sx={{ pb: '8px !important' }}>
+                                        <Typography variant="subtitle2" fontWeight="bold" gutterBottom>
+                                            {t.name}
+                                        </Typography>
+                                        <Typography
+                                            variant="body2"
+                                            sx={{
+                                                whiteSpace: 'pre-wrap',
+                                                bgcolor: 'grey.50',
+                                                p: 1.5,
+                                                borderRadius: 1,
+                                                mb: 1.5,
+                                                fontFamily: 'monospace',
+                                                fontSize: '0.8rem',
+                                            }}
+                                        >
+                                            {rendered(t.body)}
+                                        </Typography>
+                                        <Box sx={{ display: 'flex', gap: 1 }}>
+                                            <Tooltip title="Copy to clipboard (Telegram, SMS, etc.)">
+                                                <Button
+                                                    size="small"
+                                                    variant="outlined"
+                                                    startIcon={<ContentCopyIcon />}
+                                                    onClick={() => handleCopy(t.body)}
+                                                >
+                                                    Copy
+                                                </Button>
+                                            </Tooltip>
+                                            <Tooltip title="Open WhatsApp with this message pre-filled">
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    color="success"
+                                                    startIcon={<WhatsAppIcon />}
+                                                    onClick={() => handleWhatsApp(t.body)}
+                                                >
+                                                    WhatsApp
+                                                </Button>
+                                            </Tooltip>
+                                            <Tooltip title="Copy message and open Telegram chat">
+                                                <Button
+                                                    size="small"
+                                                    variant="contained"
+                                                    startIcon={<SendIcon />}
+                                                    onClick={() => handleTelegram(t.body)}
+                                                    sx={{ bgcolor: '#2AABEE', '&:hover': { bgcolor: '#1d96d4' } }}
+                                                >
+                                                    Telegram
+                                                </Button>
+                                            </Tooltip>
+                                        </Box>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                            {templates.length === 0 && (
+                                <Typography color="text.secondary">
+                                    No templates yet. Click ⚙ to add one.
+                                </Typography>
+                            )}
+                        </>
+                    )}
                 </DialogContent>
 
                 <DialogActions>

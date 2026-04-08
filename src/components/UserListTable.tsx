@@ -4,7 +4,8 @@ import * as React from 'react';
 import {
     Box, Button, Paper, Typography, Alert, CircularProgress,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Checkbox, TablePagination, FormControl, InputLabel, Select, MenuItem
+    Checkbox, TablePagination, FormControl, InputLabel, Select, MenuItem,
+    Chip, Tooltip,
 } from '@mui/material';
 import axios from 'axios';
 import FollowUpDialog from './FollowUpDialog';
@@ -13,6 +14,10 @@ import DebtorDetailDialog from './DebtorDetailDialog';
 import Snackbar from '@mui/material/Snackbar';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import IconButton from '@mui/material/IconButton';
+import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import { groupByUserId } from '@/lib/duplicateUtils';
 
 interface UserData {
     taskId: number;
@@ -38,7 +43,95 @@ interface UserData {
     contact2Phone?: string;
     contact3Phone?: string;
     totalExtensionAmount?: number;
+    userId?: number;
 }
+
+const COL_COUNT = 16;
+
+interface DataRowProps {
+    row: UserData;
+    isSelected: boolean;
+    onSelect: (taskId: number) => void;
+    onViewDetail: (user: UserData) => void;
+    duplicates?: UserData[];   // sibling rows with same phone (excluding self)
+    isDuplicateGroup?: boolean; // true for the "header" row of a group
+}
+
+const DataRow = React.memo(function DataRow({ row, isSelected, onSelect, onViewDetail, duplicates = [], isDuplicateGroup = false }: DataRowProps) {
+    const [open, setOpen] = React.useState(false);
+
+    const rowCells = (r: UserData) => (
+        <>
+            <TableCell>{r.userName}</TableCell>
+            <TableCell>{r.email || '-'}</TableCell>
+            <TableCell>{r.phone}</TableCell>
+            <TableCell>{r.appName || '-'}</TableCell>
+            <TableCell>{r.productName}</TableCell>
+            <TableCell align="right">{r.totalAmount}</TableCell>
+            <TableCell align="right">{r.repayAmount}</TableCell>
+            <TableCell align="right">{r.overdueFee}</TableCell>
+            <TableCell align="right">{r.totalExtensionAmount ?? '-'}</TableCell>
+            <TableCell align="right">{r.overdueDay}</TableCell>
+            <TableCell>{r.repayTime}</TableCell>
+            <TableCell>{r.stageName}</TableCell>
+            <TableCell>{r.followResult}</TableCell>
+            <TableCell>{r.note}</TableCell>
+        </>
+    );
+
+    return (
+        <>
+            <TableRow
+                hover
+                onClick={() => onSelect(row.taskId)}
+                role="checkbox"
+                selected={isSelected}
+                sx={{
+                    cursor: 'pointer',
+                    '& > *': isDuplicateGroup ? { borderBottom: 'unset' } : {},
+                    bgcolor: isDuplicateGroup ? 'rgba(255,160,0,0.07)' : undefined,
+                }}
+            >
+                <TableCell padding="checkbox">
+                    <Checkbox checked={isSelected} />
+                </TableCell>
+                <TableCell padding="checkbox" sx={{ whiteSpace: 'nowrap' }}>
+                    {isDuplicateGroup ? (
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <Tooltip title={`${duplicates.length + 1} repayment plans share this user ID — click to expand`}>
+                                <Chip
+                                    icon={<WarningAmberIcon />}
+                                    label={`${duplicates.length + 1} dup`}
+                                    size="small"
+                                    color="warning"
+                                    onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+                                    onDelete={e => { e.stopPropagation(); setOpen(o => !o); }}
+                                    deleteIcon={open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
+                                />
+                            </Tooltip>
+                        </Box>
+                    ) : null}
+                </TableCell>
+                <TableCell padding="checkbox">
+                    <IconButton size="small" onClick={e => { e.stopPropagation(); onViewDetail(row); }}>
+                        <VisibilityIcon fontSize="small" />
+                    </IconButton>
+                </TableCell>
+                {rowCells(row)}
+            </TableRow>
+
+            {/* Collapsed sibling rows */}
+            {isDuplicateGroup && duplicates.map(dup => (
+                <TableRow key={dup.taskId} sx={{ display: open ? undefined : 'none', bgcolor: 'rgba(255,160,0,0.04)' }}>
+                    <TableCell padding="checkbox" />
+                    <TableCell padding="checkbox" />
+                    <TableCell padding="checkbox" />
+                    {rowCells(dup)}
+                </TableRow>
+            ))}
+        </>
+    );
+});
 
 export default function UserListTable() {
     const [rows, setRows] = React.useState<UserData[]>([]);
@@ -56,6 +149,30 @@ export default function UserListTable() {
     // Filters
     const [filterAppName, setFilterAppName] = React.useState<string>('');
     const [filterOverdueDay, setFilterOverdueDay] = React.useState<string>('');
+    // Mirrored top scrollbar
+    const topScrollRef = React.useRef<HTMLDivElement>(null);
+    const tableContainerRef = React.useRef<HTMLDivElement>(null);
+    const [tableScrollWidth, setTableScrollWidth] = React.useState(0);
+
+    const tableContainerCallbackRef = React.useCallback((node: HTMLDivElement | null) => {
+        tableContainerRef.current = node;
+        if (node) {
+            setTableScrollWidth(node.scrollWidth);
+            const observer = new ResizeObserver(() => setTableScrollWidth(node.scrollWidth));
+            observer.observe(node);
+        }
+    }, []);
+
+    const handleTopScroll = () => {
+        if (tableContainerRef.current && topScrollRef.current) {
+            tableContainerRef.current.scrollLeft = topScrollRef.current.scrollLeft;
+        }
+    };
+    const handleTableScroll = () => {
+        if (tableContainerRef.current && topScrollRef.current) {
+            topScrollRef.current.scrollLeft = tableContainerRef.current.scrollLeft;
+        }
+    };
 
     React.useEffect(() => {
         setHasToken(!!localStorage.getItem('external_api_token') && !!localStorage.getItem('api_base_url'));
@@ -134,7 +251,6 @@ export default function UserListTable() {
                 headers: { Authorization: token, 'X-API-Base-URL': baseUrl }
             });
 
-            console.log("Response Data: ", JSON.stringify(response.data));
 
             if (response.data?.success && response.data?.data) {
                 const records: UserData[] = Array.isArray(response.data.data.records)
@@ -171,25 +287,13 @@ export default function UserListTable() {
         }
     };
 
-    const handleSelectOne = (taskId: number) => {
-        const selectedIndex = selected.indexOf(taskId);
-        let newSelected: number[] = [];
-
-        if (selectedIndex === -1) {
-            newSelected = newSelected.concat(selected, taskId);
-        } else if (selectedIndex === 0) {
-            newSelected = newSelected.concat(selected.slice(1));
-        } else if (selectedIndex === selected.length - 1) {
-            newSelected = newSelected.concat(selected.slice(0, -1));
-        } else if (selectedIndex > 0) {
-            newSelected = newSelected.concat(
-                selected.slice(0, selectedIndex),
-                selected.slice(selectedIndex + 1),
-            );
-        }
-
-        setSelected(newSelected);
-    };
+    const handleSelectOne = React.useCallback((taskId: number) => {
+        setSelected(prev => {
+            const idx = prev.indexOf(taskId);
+            if (idx === -1) return [...prev, taskId];
+            return prev.filter(id => id !== taskId);
+        });
+    }, []);
 
     const isSelected = (taskId: number) => selected.indexOf(taskId) !== -1;
 
@@ -219,6 +323,18 @@ export default function UserListTable() {
             return true;
         });
     }, [rows, filterAppName, filterOverdueDay]);
+
+    // Group by userId: duplicates float to the top
+    const { duplicateGroups, singleRows } = React.useMemo(
+        () => groupByUserId(filteredRows),
+        [filteredRows]
+    );
+
+    React.useEffect(() => {
+        if (tableContainerRef.current) {
+            setTableScrollWidth(tableContainerRef.current.scrollWidth);
+        }
+    }, [filteredRows]);
 
     return (
         <Paper sx={{ width: '100%', p: 2 }}>
@@ -288,7 +404,24 @@ export default function UserListTable() {
                             </Typography>
                         </Box>
                     ) : (
-                        <TableContainer>
+                        <>
+                        <TablePagination
+                            component="div"
+                            count={rowCount}
+                            page={page}
+                            onPageChange={handleChangePage}
+                            rowsPerPage={pageSize}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                            rowsPerPageOptions={[50, 100, 250]}
+                        />
+                        <Box
+                            ref={topScrollRef}
+                            onScroll={handleTopScroll}
+                            sx={{ overflowX: 'auto', overflowY: 'hidden', height: 20 }}
+                        >
+                            <Box sx={{ width: tableScrollWidth, height: 1 }} />
+                        </Box>
+                        <TableContainer ref={tableContainerCallbackRef} onScroll={handleTableScroll}>
                             <Table size="small">
                                 <TableHead>
                                     <TableRow>
@@ -299,6 +432,8 @@ export default function UserListTable() {
                                                 onChange={handleSelectAll}
                                             />
                                         </TableCell>
+                                        <TableCell padding="checkbox" />
+                                        <TableCell padding="checkbox" />
                                         <TableCell>User Name</TableCell>
                                         <TableCell>Email</TableCell>
                                         <TableCell>Phone</TableCell>
@@ -313,53 +448,34 @@ export default function UserListTable() {
                                         <TableCell>Stage</TableCell>
                                         <TableCell>Result</TableCell>
                                         <TableCell>Note</TableCell>
-                                        <TableCell padding="checkbox" />
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
-                                    {filteredRows.map((row) => {
-                                        const isItemSelected = isSelected(row.taskId);
-                                        return (
-                                            <TableRow
-                                                key={row.taskId}
-                                                hover
-                                                onClick={() => handleSelectOne(row.taskId)}
-                                                role="checkbox"
-                                                selected={isItemSelected}
-                                                sx={{ cursor: 'pointer' }}
-                                            >
-                                                <TableCell padding="checkbox">
-                                                    <Checkbox checked={isItemSelected} />
-                                                </TableCell>
-                                                <TableCell>{row.userName}</TableCell>
-                                                <TableCell>{row.email || '-'}</TableCell>
-                                                <TableCell>{row.phone}</TableCell>
-                                                <TableCell>{row.appName || '-'}</TableCell>
-                                                <TableCell>{row.productName}</TableCell>
-                                                <TableCell align="right">{row.totalAmount}</TableCell>
-                                                <TableCell align="right">{row.repayAmount}</TableCell>
-                                                <TableCell align="right">{row.overdueFee}</TableCell>
-                                                <TableCell align="right">{row.totalExtensionAmount ?? '-'}</TableCell>
-                                                <TableCell align="right">{row.overdueDay}</TableCell>
-                                                <TableCell>{row.repayTime}</TableCell>
-                                                <TableCell>{row.stageName}</TableCell>
-                                                <TableCell>{row.followResult}</TableCell>
-                                                <TableCell>{row.note}</TableCell>
-                                                <TableCell padding="checkbox">
-                                                    <IconButton
-                                                        size="small"
-                                                        title="View detail"
-                                                        onClick={e => { e.stopPropagation(); setDetailUser(row); }}
-                                                    >
-                                                        <VisibilityIcon fontSize="small" />
-                                                    </IconButton>
-                                                </TableCell>
-                                            </TableRow>
-                                        );
-                                    })}
+                                    {/* Duplicate groups first */}
+                                    {duplicateGroups.map(group => (
+                                        <DataRow
+                                            key={group[0].taskId}
+                                            row={group[0]}
+                                            isSelected={isSelected(group[0].taskId)}
+                                            onSelect={handleSelectOne}
+                                            onViewDetail={setDetailUser}
+                                            duplicates={group.slice(1)}
+                                            isDuplicateGroup
+                                        />
+                                    ))}
+                                    {/* Single rows */}
+                                    {singleRows.map(row => (
+                                        <DataRow
+                                            key={row.taskId}
+                                            row={row}
+                                            isSelected={isSelected(row.taskId)}
+                                            onSelect={handleSelectOne}
+                                            onViewDetail={setDetailUser}
+                                        />
+                                    ))}
                                     {filteredRows.length === 0 && (
                                         <TableRow>
-                                            <TableCell colSpan={16} align="center">
+                                            <TableCell colSpan={COL_COUNT} align="center">
                                                 No data available
                                             </TableCell>
                                         </TableRow>
@@ -367,16 +483,17 @@ export default function UserListTable() {
                                 </TableBody>
                             </Table>
                         </TableContainer>
+                        <TablePagination
+                            component="div"
+                            count={rowCount}
+                            page={page}
+                            onPageChange={handleChangePage}
+                            rowsPerPage={pageSize}
+                            onRowsPerPageChange={handleChangeRowsPerPage}
+                            rowsPerPageOptions={[50, 100, 250]}
+                        />
+                        </>
                     )}
-                    <TablePagination
-                        component="div"
-                        count={rowCount}
-                        page={page}
-                        onPageChange={handleChangePage}
-                        rowsPerPage={pageSize}
-                        onRowsPerPageChange={handleChangeRowsPerPage}
-                        rowsPerPageOptions={[50, 100, 250]}
-                    />
                 </>
             )}
 
