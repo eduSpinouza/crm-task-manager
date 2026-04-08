@@ -83,6 +83,13 @@ Vercel auto-deploys from the `master` branch of `eduSpinouza/crm-task-manager`. 
 
 Do **not** add `Co-Authored-By` trailers to commits.
 
+## Git workflow
+
+- **Never commit directly to `master`.** All new features and fixes must start on a dedicated branch.
+- Branch naming: `feature/<short-description>` or `fix/<short-description>`.
+- Open a Pull Request to merge into `master`. Vercel will build a preview URL for the branch automatically — test it before merging.
+- `master` is always the stable, live state. A rollback is a single PR revert or a Vercel "Promote to Production" of the previous deployment.
+
 ### Test Coverage
 
 | File | Tests | Covers |
