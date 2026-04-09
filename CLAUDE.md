@@ -24,6 +24,9 @@ nvs exec node/24.13.0/x64 npm run dev
 # Build for production (always run before pushing to catch TypeScript errors)
 nvs exec node/24.13.0/x64 npm run build
 
+# Type-check only (faster than full build — catches errors Turbopack misses)
+nvs exec node/24.13.0/x64 npx.cmd tsc --noEmit
+
 # Lint
 npm run lint
 
