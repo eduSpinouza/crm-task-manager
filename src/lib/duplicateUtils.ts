@@ -1,7 +1,6 @@
 export interface DuplicateRow {
     userId?: number;
     taskId: number;
-    [key: string]: unknown;
 }
 
 export interface DuplicateGroups<T extends DuplicateRow> {
