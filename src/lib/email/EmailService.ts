@@ -1,5 +1,6 @@
 import { EmailProvider, EmailSendResult } from './EmailProvider';
 import { GmailProvider } from './providers/GmailProvider';
+import { GmailOAuthProvider } from './providers/GmailOAuthProvider';
 import { replacePlaceholders } from '../templateUtils';
 
 export interface UserData {
@@ -14,19 +15,33 @@ export interface UserData {
     [key: string]: any;
 }
 
-export interface EmailServiceConfig {
-    provider: 'gmail'; // | 'resend' | 'brevo' for future
-    gmail?: {
-        user: string;
-        appPassword: string;
-    };
-}
+export type EmailServiceConfig =
+    | {
+          provider: 'gmail-oauth';
+          user: string;
+          clientId: string;
+          clientSecret: string;
+          refreshToken: string;
+      }
+    | {
+          // Legacy app-password path — kept for rollback safety
+          provider: 'gmail';
+          gmail: { user: string; appPassword: string };
+      };
 
 export class EmailService {
     private provider: EmailProvider;
 
     constructor(config: EmailServiceConfig) {
         switch (config.provider) {
+            case 'gmail-oauth':
+                this.provider = new GmailOAuthProvider({
+                    user: config.user,
+                    clientId: config.clientId,
+                    clientSecret: config.clientSecret,
+                    refreshToken: config.refreshToken,
+                });
+                break;
             case 'gmail':
                 if (!config.gmail) {
                     throw new Error('Gmail configuration required');
@@ -34,7 +49,7 @@ export class EmailService {
                 this.provider = new GmailProvider(config.gmail);
                 break;
             default:
-                throw new Error(`Unknown email provider: ${config.provider}`);
+                throw new Error(`Unknown email provider`);
         }
     }
 

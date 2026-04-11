@@ -61,6 +61,7 @@ interface EditableValues {
     totalAmount: string;
     totalExtensionAmount: string;
     repayTime: string;
+    overdueDay: string;
 }
 
 function toEditable(user: UserData): EditableValues {
@@ -70,6 +71,7 @@ function toEditable(user: UserData): EditableValues {
         totalAmount: String(user.totalAmount ?? ''),
         totalExtensionAmount: String(user.totalExtensionAmount ?? ''),
         repayTime: user.repayTime ?? '',
+        overdueDay: String(user.overdueDay ?? ''),
     };
 }
 
@@ -312,11 +314,7 @@ export default function DebtorDetailDialog({ open, onClose, user }: DebtorDetail
                 <EditableField label="Contract Amount"  field="totalAmount"         value={val.totalAmount}         numeric {...fieldProps} />
                 <EditableField label="Total Amount Due" field="repayAmount"          value={val.repayAmount}         numeric highlight {...fieldProps} />
                 <EditableField label="Overdue Fee"      field="overdueFee"           value={val.overdueFee}          numeric highlight {...fieldProps} />
-                <InfoRow
-                    label="Overdue Days"
-                    value={user.overdueDay}
-                    highlight={user.overdueDay > 0}
-                />
+                <EditableField label="Overdue Days"     field="overdueDay"           value={val.overdueDay}          numeric highlight {...fieldProps} />
                 <EditableField label="Extension Amount" field="totalExtensionAmount" value={val.totalExtensionAmount} numeric {...fieldProps} />
                 <EditableField label="Repay Time"       field="repayTime"            value={val.repayTime}           {...fieldProps} />
             </Box>

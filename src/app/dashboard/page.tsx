@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Box, AppBar, Toolbar, Typography, Button, Container, Alert, Snackbar, Tabs, Tab } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, Button, Alert, Snackbar, Tabs, Tab } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import SecurityIcon from '@mui/icons-material/Security';
 import { useRouter } from 'next/navigation';
@@ -102,13 +102,13 @@ export default function DashboardPage() {
                 </Box>
             )}
 
-            <Container maxWidth="xl" sx={{ mt: 4 }}>
+            <Box sx={{ mt: 4, px: 4, width: '100%' }}>
                 {currentTab === 'crm' || userRole !== 'admin' ? (
                     <UserListTable />
                 ) : (
                     <SecurityPanel currentUser={currentUsername} />
                 )}
-            </Container>
+            </Box>
 
             <UserManagementDialog
                 open={usersDialogOpen}

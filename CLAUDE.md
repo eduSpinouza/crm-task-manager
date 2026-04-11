@@ -50,7 +50,7 @@ nvs exec node/24.13.0/x64 npx.cmd vitest run src/lib/__tests__/auth.test.ts
 - **Single-session enforcement**: A new login invalidates the previous session. The dashboard polls `/api/auth/session` every 30s to detect forced logouts.
 - **Role in JWT**: The `role` field (`admin` | `user`) is embedded in the JWT cookie (`auth_token`, httpOnly). Middleware checks the cookie on every protected route.
 - **MUI Table over DataGrid**: MUI X DataGrid has React 19 compatibility issues — use standard MUI Table instead.
-- **Email abstraction**: `EmailProvider` interface in `src/lib/email/` allows swapping providers. Current implementation is Gmail SMTP via Nodemailer.
+- **Email abstraction**: `EmailProvider` interface in `src/lib/email/` allows swapping providers. Current implementation is Gmail OAuth2 via Nodemailer (`GmailOAuthProvider`). The legacy app-password provider (`GmailProvider`) is kept for rollback but is not used by the UI. Connected accounts are stored in Redis under `emailaccounts:{username}`.
 - **Client-side config**: The external CRM Bearer token and email credentials (Gmail address, app password) are stored in `localStorage`, not server-side. Users configure these via the Settings dialog.
 
 ### `UserData` Interface — Keep in Sync
@@ -77,6 +77,10 @@ This interface exists in three places and must stay compatible:
 | `KV_REST_API_URL` | Upstash/Vercel KV REST URL |
 | `KV_REST_API_TOKEN` | Upstash/Vercel KV REST token |
 | `SEED_SECRET` | Optional secret for `/api/admin/seed` |
+| `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud OAuth Web Client ID (for Gmail OAuth) |
+| `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud OAuth Web Client secret |
+| `GOOGLE_OAUTH_REDIRECT_URI` | OAuth callback URL (e.g. `http://localhost:3000/api/auth/gmail/callback`) |
+| `EMAIL_TEST_OVERRIDE` | Optional: redirect first send to this address for smoke testing |
 
 ### Deployment
 

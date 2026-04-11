@@ -125,13 +125,18 @@ const DataRow = React.memo(function DataRow({ row, isSelected, onSelect, onViewD
                 <TableRow key={dup.taskId} sx={{ display: open ? undefined : 'none', bgcolor: 'rgba(255,160,0,0.04)' }}>
                     <TableCell padding="checkbox" />
                     <TableCell padding="checkbox" />
-                    <TableCell padding="checkbox" />
+                    <TableCell padding="checkbox">
+                        <IconButton size="small" onClick={e => { e.stopPropagation(); onViewDetail(dup); }}>
+                            <VisibilityIcon fontSize="small" />
+                        </IconButton>
+                    </TableCell>
                     {rowCells(dup)}
                 </TableRow>
             ))}
         </>
     );
 });
+
 
 export default function UserListTable() {
     const [rows, setRows] = React.useState<UserData[]>([]);

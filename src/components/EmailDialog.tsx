@@ -19,6 +19,10 @@ import {
     ListItemButton,
     ListItemText,
     ListItemSecondaryAction,
+    FormControl,
+    InputLabel,
+    Select,
+    MenuItem,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
@@ -48,12 +52,21 @@ interface EmailTemplate {
     body: string;
 }
 
+interface EmailAccount {
+    id: string;
+    label: string;
+    email: string;
+    isDefault: boolean;
+}
+
 interface EmailDialogProps {
     open: boolean;
     onClose: () => void;
     selectedUsers: UserData[];
     onSuccess: () => void;
 }
+
+const LAST_ACCOUNT_KEY = 'email_last_used_account_id';
 
 export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }: EmailDialogProps) {
     const [subject, setSubject] = useState('');
@@ -65,15 +78,36 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
     const [templates, setTemplates] = useState<EmailTemplate[]>([]);
     const [templateName, setTemplateName] = useState('');
 
+    // Sender accounts
+    const [accounts, setAccounts] = useState<EmailAccount[]>([]);
+    const [selectedAccountId, setSelectedAccountId] = useState('');
+
     // Load templates from localStorage
     useEffect(() => {
         const saved = localStorage.getItem('email_templates');
         if (saved) {
-            try {
-                setTemplates(JSON.parse(saved));
-            } catch { }
+            try { setTemplates(JSON.parse(saved)); } catch { }
         }
     }, []);
+
+    // Load accounts when dialog opens
+    useEffect(() => {
+        if (!open) return;
+        axios.get('/api/email/accounts').then(res => {
+            const accts: EmailAccount[] = res.data.accounts ?? [];
+            setAccounts(accts);
+
+            // Prefer last-used account, then the one marked default, then the first
+            const lastUsed = localStorage.getItem(LAST_ACCOUNT_KEY);
+            const preferred =
+                accts.find(a => a.id === lastUsed) ??
+                accts.find(a => a.isDefault) ??
+                accts[0];
+            setSelectedAccountId(preferred?.id ?? '');
+        }).catch(() => {
+            setAccounts([]);
+        });
+    }, [open]);
 
     // Save templates to localStorage
     const saveTemplates = (newTemplates: EmailTemplate[]) => {
@@ -107,11 +141,8 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
         setSending(true);
         setProgress(0);
 
-        const emailUser = localStorage.getItem('email_sender');
-        const emailPassword = localStorage.getItem('email_app_password');
-
-        if (!emailUser || !emailPassword) {
-            setError('Please configure email settings in the dashboard (Settings icon)');
+        if (!selectedAccountId) {
+            setError('Please connect a Gmail account in Settings before sending emails.');
             setSending(false);
             return;
         }
@@ -124,15 +155,13 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
         }
 
         try {
+            localStorage.setItem(LAST_ACCOUNT_KEY, selectedAccountId);
+
             const response = await axios.post('/api/email/send', {
                 users: usersWithEmail,
                 subject,
                 bodyTemplate: body,
-                emailConfig: {
-                    provider: 'gmail',
-                    user: emailUser,
-                    appPassword: emailPassword,
-                },
+                accountId: selectedAccountId,
             });
 
             setProgress(100);
@@ -175,6 +204,29 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
             <DialogTitle>Send Email to {selectedUsers.length} Users</DialogTitle>
             <DialogContent>
+                {/* Sender account picker */}
+                <FormControl fullWidth size="small" sx={{ mb: 2, mt: 1 }}>
+                    <InputLabel>Send from</InputLabel>
+                    <Select
+                        value={selectedAccountId}
+                        label="Send from"
+                        onChange={e => setSelectedAccountId(e.target.value)}
+                        displayEmpty
+                    >
+                        {accounts.length === 0 ? (
+                            <MenuItem value="" disabled>
+                                No Gmail accounts — connect one in Settings
+                            </MenuItem>
+                        ) : (
+                            accounts.map(a => (
+                                <MenuItem key={a.id} value={a.id}>
+                                    {a.email}{a.isDefault ? ' (default)' : ''}
+                                </MenuItem>
+                            ))
+                        )}
+                    </Select>
+                </FormControl>
+
                 <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 2 }}>
                     <Tab label="Compose" />
                     <Tab label="Templates" />
@@ -278,7 +330,7 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
                 <Button
                     variant="contained"
                     onClick={handleSend}
-                    disabled={sending || !subject.trim() || !body.trim()}
+                    disabled={sending || !subject.trim() || !body.trim() || !selectedAccountId}
                 >
                     {sending ? 'Sending...' : `Send to ${selectedUsers.filter(u => u.email).length} Users`}
                 </Button>
