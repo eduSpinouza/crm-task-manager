@@ -6,7 +6,7 @@ export function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
     // Public routes - no auth required
-    const publicPaths = ['/login', '/api/auth/login', '/api/auth/setup', '/api/admin/seed'];
+    const publicPaths = ['/login', '/api/auth/login', '/api/auth/setup', '/api/admin/seed', '/api/auth/gmail/callback'];
     if (publicPaths.some(path => pathname.startsWith(path))) {
         return NextResponse.next();
     }
