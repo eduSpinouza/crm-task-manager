@@ -19,7 +19,10 @@ src/
 │   │   │   ├── users/          # Admin CRUD for user management
 │   │   │   └── seed/           # One-time seed from USERS_CONFIG to Redis
 │   │   ├── auth/login/         # JWT authentication
-│   │   ├── email/send/         # Email sending endpoint
+│   │   ├── auth/gmail/start/   # Initiate Gmail OAuth2 flow
+│   │   ├── auth/gmail/callback/ # Handle Google OAuth2 callback
+│   │   ├── email/send/         # Email sending endpoint (uses accountId + Redis)
+│   │   ├── email/accounts/     # CRUD for connected Gmail accounts
 │   │   └── users/
 │   │       ├── list/           # Proxy: fetch user list
 │   │       ├── taskinfo/       # Proxy: fetch task details (email, etc.)
@@ -307,6 +310,7 @@ Errors are learning opportunities. When something breaks:
 - **Login page**: POST auth, httpOnly cookie, Suspense boundary, licensing warning
 - **Dashboard**: Session polling every 30s, kicked-user redirect, admin panel
 - **Security Monitor**: Login event log (max 20, `loginlog:{user}` Redis key), session kick log (max 50, `kicklog:{user}`), `blocked` field on `UserConfig`, PATCH /api/admin/users for block/unblock, SecurityPanel component with suspicious detection (2+ IPs in 24h or 3+ kicks in 7d), Security Monitor tab in dashboard (admin only)
+- **Gmail OAuth multi-account email**: Users connect Gmail accounts via OAuth2 (no app passwords). Accounts stored in Redis under `emailaccounts:{username}` (JSON array of `EmailAccount`). OAuth flow: `/api/auth/gmail/start` → Google consent → `/api/auth/gmail/callback`. CRUD at `/api/email/accounts`. Send route reads `accountId` from request body, looks up refresh token in Redis, builds `EmailService` with `provider: 'gmail-oauth'`. Env vars required: `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, `GOOGLE_OAUTH_REDIRECT_URI`. Optional: `EMAIL_TEST_OVERRIDE` to redirect sends for testing.
 
 ## Testing
 ```bash

@@ -1,12 +1,17 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { EmailService, UserData } from '../email/EmailService';
 
-// Mock GmailProvider so no real SMTP connection is made.
-// The mock's send() resolves to a success result and captures its arguments.
+// Mock both providers so no real SMTP/OAuth connection is made.
 const mockSend = vi.fn().mockResolvedValue({ success: true, messageId: 'test-id' });
 
 vi.mock('../email/providers/GmailProvider', () => ({
     GmailProvider: vi.fn().mockImplementation(function () {
+        return { send: mockSend };
+    }),
+}));
+
+vi.mock('../email/providers/GmailOAuthProvider', () => ({
+    GmailOAuthProvider: vi.fn().mockImplementation(function () {
         return { send: mockSend };
     }),
 }));
@@ -21,12 +26,36 @@ const BASE_USER: UserData = {
     stageName: 'Stage1',
 };
 
+// Use the legacy branch for placeholder tests — they don't care which provider is under the hood
 function makeService() {
     return new EmailService({
         provider: 'gmail',
         gmail: { user: 'sender@gmail.com', appPassword: 'secret' },
     });
 }
+
+function makeOAuthService() {
+    return new EmailService({
+        provider: 'gmail-oauth',
+        user: 'sender@gmail.com',
+        clientId: 'client-id',
+        clientSecret: 'client-secret',
+        refreshToken: 'refresh-token',
+    });
+}
+
+describe('EmailService – provider selection', () => {
+    it('instantiates GmailOAuthProvider for gmail-oauth config', async () => {
+        const { GmailOAuthProvider } = await import('../email/providers/GmailOAuthProvider');
+        makeOAuthService();
+        expect(GmailOAuthProvider).toHaveBeenCalledWith({
+            user: 'sender@gmail.com',
+            clientId: 'client-id',
+            clientSecret: 'client-secret',
+            refreshToken: 'refresh-token',
+        });
+    });
+});
 
 describe('EmailService – {{extensionAmount}} placeholder', () => {
     beforeEach(() => {
