@@ -23,12 +23,11 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    Divider,
     Chip,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
-import TableChartIcon from '@mui/icons-material/TableChart';
 import axios from 'axios';
+import { mergeTemplates, hideDefault, DEFAULT_TEMPLATES, type EmailTemplate as DefaultEmailTemplate } from '@/lib/defaultTemplates';
 
 interface UserData {
     email?: string;
@@ -49,11 +48,7 @@ interface UserData {
     [key: string]: any;
 }
 
-interface EmailTemplate {
-    name: string;
-    subject: string;
-    body: string;
-}
+type EmailTemplate = DefaultEmailTemplate;
 
 interface EmailAccount {
     id: string;
@@ -85,17 +80,13 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState('');
 
-    // Google Sheets connection
-    const [sheetsConnected, setSheetsConnected] = useState(false);
-    const [sheetsEmail, setSheetsEmail] = useState<string | null>(null);
-    const [sheetsLoading, setSheetsLoading] = useState(false);
-
-    // Load templates from localStorage
+    // Load templates from localStorage, merged with defaults
     useEffect(() => {
-        const saved = localStorage.getItem('email_templates');
-        if (saved) {
-            try { setTemplates(JSON.parse(saved)); } catch { }
-        }
+        let userTemplates: EmailTemplate[] = [];
+        try {
+            userTemplates = JSON.parse(localStorage.getItem('email_templates') || '[]');
+        } catch { }
+        setTemplates(mergeTemplates(userTemplates));
     }, []);
 
     // Load accounts + Sheets status when dialog opens
@@ -116,45 +107,13 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
             setAccounts([]);
         });
 
-        axios.get('/api/auth/sheets').then(res => {
-            setSheetsConnected(res.data.connected ?? false);
-            setSheetsEmail(res.data.email ?? null);
-        }).catch(() => {
-            setSheetsConnected(false);
-            setSheetsEmail(null);
-        });
     }, [open]);
 
-    const handleConnectSheets = () => {
-        const popup = window.open('/api/auth/sheets/start', 'sheets-oauth', 'width=520,height=620');
-        const onMessage = (event: MessageEvent) => {
-            if (event.origin !== window.location.origin) return;
-            if (event.data?.type !== 'sheets-oauth') return;
-            window.removeEventListener('message', onMessage);
-            popup?.close();
-            if (event.data.status === 'success') {
-                setSheetsConnected(true);
-                setSheetsEmail(event.data.detail);
-            }
-        };
-        window.addEventListener('message', onMessage);
-    };
-
-    const handleDisconnectSheets = async () => {
-        setSheetsLoading(true);
-        try {
-            await axios.delete('/api/auth/sheets');
-            setSheetsConnected(false);
-            setSheetsEmail(null);
-        } finally {
-            setSheetsLoading(false);
-        }
-    };
-
-    // Save templates to localStorage
+    // Save templates to localStorage (user templates only; defaults are never persisted)
     const saveTemplates = (newTemplates: EmailTemplate[]) => {
         setTemplates(newTemplates);
-        localStorage.setItem('email_templates', JSON.stringify(newTemplates));
+        const userOnly = newTemplates.filter(t => !t.isDefault);
+        localStorage.setItem('email_templates', JSON.stringify(userOnly));
     };
 
     const handleSaveTemplate = () => {
@@ -175,6 +134,10 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
     };
 
     const handleDeleteTemplate = (name: string) => {
+        const target = templates.find(t => t.name === name);
+        if (target?.isDefault) {
+            hideDefault(name);
+        }
         saveTemplates(templates.filter(t => t.name !== name));
     };
 
@@ -321,7 +284,17 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
                         <List>
                             {templates.map(t => (
                                 <ListItemButton key={t.name} onClick={() => handleLoadTemplate(t)}>
-                                    <ListItemText primary={t.name} secondary={t.subject} />
+                                    <ListItemText
+                                        primary={
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {t.name}
+                                                {t.isDefault && (
+                                                    <Chip label="Default" size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                                                )}
+                                            </Box>
+                                        }
+                                        secondary={t.subject}
+                                    />
                                     <ListItemSecondaryAction>
                                         <IconButton edge="end" onClick={() => handleDeleteTemplate(t.name)}>
                                             <DeleteIcon />
@@ -365,39 +338,6 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
 
                 {sending && <LinearProgress sx={{ mt: 2 }} />}
 
-                {/* Google Sheets for Export */}
-                <Divider sx={{ mt: 3, mb: 2 }} />
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                    <TableChartIcon fontSize="small" color="action" />
-                    <Typography variant="subtitle2">Google Sheets for Export</Typography>
-                </Box>
-                {sheetsConnected && sheetsEmail ? (
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Chip label={sheetsEmail} size="small" color="success" variant="outlined" />
-                        <Button
-                            size="small"
-                            color="error"
-                            disabled={sheetsLoading}
-                            onClick={handleDisconnectSheets}
-                        >
-                            Disconnect
-                        </Button>
-                    </Box>
-                ) : (
-                    <Box>
-                        <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                            Connect a Google account to enable the &ldquo;Export to Google Sheets&rdquo; feature on the user list.
-                        </Typography>
-                        <Button
-                            variant="outlined"
-                            size="small"
-                            startIcon={<TableChartIcon />}
-                            onClick={handleConnectSheets}
-                        >
-                            Connect Google Sheets
-                        </Button>
-                    </Box>
-                )}
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={sending}>
