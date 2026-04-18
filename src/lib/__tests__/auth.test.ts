@@ -341,6 +341,32 @@ describe('createSession — kick tracking', () => {
         const kicks = await getKickHistory(freshUser);
         expect(kicks.length).toBe(0);
     });
+
+    it('createSession from same device (same IP + UA) does NOT log a kick — browser re-login', async () => {
+        const sameDeviceUser = `same-device-${Date.now()}`;
+        // First login from device A
+        await createSession(sameDeviceUser, '10.0.0.1', 'Mozilla/5.0 Chrome/120');
+        // Re-login from the exact same device (browser closed and reopened)
+        await createSession(sameDeviceUser, '10.0.0.1', 'Mozilla/5.0 Chrome/120');
+        const kicks = await getKickHistory(sameDeviceUser);
+        expect(kicks.length).toBe(0);
+    });
+
+    it('createSession from different IP only still logs a kick', async () => {
+        const diffIpUser = `diff-ip-${Date.now()}`;
+        await createSession(diffIpUser, '10.0.0.1', 'Mozilla/5.0 Chrome/120');
+        await createSession(diffIpUser, '10.0.0.2', 'Mozilla/5.0 Chrome/120');
+        const kicks = await getKickHistory(diffIpUser);
+        expect(kicks.length).toBe(1);
+    });
+
+    it('createSession from different UA only still logs a kick', async () => {
+        const diffUaUser = `diff-ua-${Date.now()}`;
+        await createSession(diffUaUser, '10.0.0.1', 'Mozilla/5.0 Chrome/120');
+        await createSession(diffUaUser, '10.0.0.1', 'Mozilla/5.0 Firefox/121');
+        const kicks = await getKickHistory(diffUaUser);
+        expect(kicks.length).toBe(1);
+    });
 });
 
 // ============================================================

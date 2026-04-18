@@ -187,10 +187,15 @@ export const sessionStore: SessionStore = createSessionStore();
 // ============================================================
 
 export async function createSession(userId: string, ip: string, userAgent: string): Promise<SessionInfo> {
-    // If a session already exists, the existing user is being kicked — log it
+    // If a session already exists from a *different* device/location, log a kick.
+    // Same IP + same User-Agent means the user closed the browser and re-logged in
+    // from the same device — that is a normal re-login, not a concurrent access kick.
     const existing = await sessionStore.get(userId);
     if (existing) {
-        await logKickEvent(userId);
+        const sameDevice = existing.ip === ip && existing.userAgent === userAgent;
+        if (!sameDevice) {
+            await logKickEvent(userId);
+        }
     }
 
     const session: SessionInfo = {

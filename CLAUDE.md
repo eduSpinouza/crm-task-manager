@@ -79,7 +79,8 @@ This interface exists in three places and must stay compatible:
 | `SEED_SECRET` | Optional secret for `/api/admin/seed` |
 | `GOOGLE_OAUTH_CLIENT_ID` | Google Cloud OAuth Web Client ID (for Gmail OAuth) |
 | `GOOGLE_OAUTH_CLIENT_SECRET` | Google Cloud OAuth Web Client secret |
-| `GOOGLE_OAUTH_REDIRECT_URI` | OAuth callback URL (e.g. `http://localhost:3000/api/auth/gmail/callback`) |
+| `GOOGLE_OAUTH_REDIRECT_URI` | Gmail OAuth callback URL (e.g. `http://localhost:3000/api/auth/gmail/callback`) |
+| `GOOGLE_SHEETS_OAUTH_REDIRECT_URI` | Sheets OAuth callback URL (e.g. `http://localhost:3000/api/auth/sheets/callback`) |
 | `EMAIL_TEST_OVERRIDE` | Optional: redirect first send to this address for smoke testing |
 
 ### Deployment

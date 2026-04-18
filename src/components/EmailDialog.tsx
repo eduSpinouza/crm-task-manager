@@ -23,9 +23,11 @@ import {
     InputLabel,
     Select,
     MenuItem,
+    Chip,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
+import { mergeTemplates, hideDefault, DEFAULT_TEMPLATES, type EmailTemplate as DefaultEmailTemplate } from '@/lib/defaultTemplates';
 
 interface UserData {
     email?: string;
@@ -46,11 +48,7 @@ interface UserData {
     [key: string]: any;
 }
 
-interface EmailTemplate {
-    name: string;
-    subject: string;
-    body: string;
-}
+type EmailTemplate = DefaultEmailTemplate;
 
 interface EmailAccount {
     id: string;
@@ -82,15 +80,16 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState('');
 
-    // Load templates from localStorage
+    // Load templates from localStorage, merged with defaults
     useEffect(() => {
-        const saved = localStorage.getItem('email_templates');
-        if (saved) {
-            try { setTemplates(JSON.parse(saved)); } catch { }
-        }
+        let userTemplates: EmailTemplate[] = [];
+        try {
+            userTemplates = JSON.parse(localStorage.getItem('email_templates') || '[]');
+        } catch { }
+        setTemplates(mergeTemplates(userTemplates));
     }, []);
 
-    // Load accounts when dialog opens
+    // Load accounts + Sheets status when dialog opens
     useEffect(() => {
         if (!open) return;
         axios.get('/api/email/accounts').then(res => {
@@ -107,12 +106,14 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
         }).catch(() => {
             setAccounts([]);
         });
+
     }, [open]);
 
-    // Save templates to localStorage
+    // Save templates to localStorage (user templates only; defaults are never persisted)
     const saveTemplates = (newTemplates: EmailTemplate[]) => {
         setTemplates(newTemplates);
-        localStorage.setItem('email_templates', JSON.stringify(newTemplates));
+        const userOnly = newTemplates.filter(t => !t.isDefault);
+        localStorage.setItem('email_templates', JSON.stringify(userOnly));
     };
 
     const handleSaveTemplate = () => {
@@ -133,6 +134,10 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
     };
 
     const handleDeleteTemplate = (name: string) => {
+        const target = templates.find(t => t.name === name);
+        if (target?.isDefault) {
+            hideDefault(name);
+        }
         saveTemplates(templates.filter(t => t.name !== name));
     };
 
@@ -279,7 +284,17 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
                         <List>
                             {templates.map(t => (
                                 <ListItemButton key={t.name} onClick={() => handleLoadTemplate(t)}>
-                                    <ListItemText primary={t.name} secondary={t.subject} />
+                                    <ListItemText
+                                        primary={
+                                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                                {t.name}
+                                                {t.isDefault && (
+                                                    <Chip label="Default" size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                                                )}
+                                            </Box>
+                                        }
+                                        secondary={t.subject}
+                                    />
                                     <ListItemSecondaryAction>
                                         <IconButton edge="end" onClick={() => handleDeleteTemplate(t.name)}>
                                             <DeleteIcon />
@@ -322,6 +337,7 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
                 )}
 
                 {sending && <LinearProgress sx={{ mt: 2 }} />}
+
             </DialogContent>
             <DialogActions>
                 <Button onClick={onClose} disabled={sending}>

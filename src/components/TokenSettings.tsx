@@ -35,6 +35,8 @@ export default function TokenSettings() {
     const [tabIndex, setTabIndex] = React.useState(0);
     const [token, setToken] = React.useState('');
     const [apiBaseUrl, setApiBaseUrl] = React.useState('');
+    const savedToken = React.useRef('');
+    const savedApiBaseUrl = React.useRef('');
 
     // Email accounts state
     const [accounts, setAccounts] = React.useState<EmailAccount[]>([]);
@@ -42,19 +44,55 @@ export default function TokenSettings() {
     const [accountsError, setAccountsError] = React.useState('');
     const [connectingGmail, setConnectingGmail] = React.useState(false);
 
+    // Google Sheets account state
+    const [sheetsEmail, setSheetsEmail] = React.useState<string | null>(null);
+    const [sheetsDisconnecting, setSheetsDisconnecting] = React.useState(false);
+
     const handleClickOpen = () => {
-        setToken(localStorage.getItem('external_api_token') || '');
-        setApiBaseUrl(localStorage.getItem('api_base_url') || '');
+        const t = localStorage.getItem('external_api_token') || '';
+        const u = localStorage.getItem('api_base_url') || '';
+        setToken(t);
+        setApiBaseUrl(u);
+        savedToken.current = t;
+        savedApiBaseUrl.current = u;
         setOpen(true);
         fetchAccounts();
+        fetchSheetsAccount();
     };
 
     const handleClose = () => setOpen(false);
 
     const handleSave = () => {
+        const cleanUrl = apiBaseUrl.replace(/\/+$/, '');
         localStorage.setItem('external_api_token', token);
-        localStorage.setItem('api_base_url', apiBaseUrl.replace(/\/+$/, ''));
-        window.location.reload();
+        localStorage.setItem('api_base_url', cleanUrl);
+        const apiChanged = token !== savedToken.current || cleanUrl !== savedApiBaseUrl.current;
+        if (apiChanged) {
+            window.location.reload();
+        } else {
+            setOpen(false);
+        }
+    };
+
+    const fetchSheetsAccount = async () => {
+        try {
+            const res = await axios.get('/api/auth/sheets');
+            setSheetsEmail(res.data.connected ? (res.data.email ?? null) : null);
+        } catch {
+            setSheetsEmail(null);
+        }
+    };
+
+    const handleDisconnectSheets = async () => {
+        setSheetsDisconnecting(true);
+        try {
+            await axios.delete('/api/auth/sheets');
+            setSheetsEmail(null);
+        } catch {
+            setAccountsError('Failed to disconnect Google Sheets account.');
+        } finally {
+            setSheetsDisconnecting(false);
+        }
     };
 
     const fetchAccounts = async () => {
@@ -241,6 +279,35 @@ export default function TokenSettings() {
                             >
                                 {connectingGmail ? 'Connecting…' : 'Connect Gmail'}
                             </Button>
+
+                            <Box sx={{ mt: 3 }}>
+                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
+                                    Google Sheets Export
+                                </Typography>
+                                {sheetsEmail ? (
+                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                        <Typography variant="body2" sx={{ flex: 1 }}>
+                                            {sheetsEmail}
+                                        </Typography>
+                                        <Chip label="Connected" size="small" color="success" />
+                                        <Tooltip title="Disconnect and revoke access">
+                                            <IconButton
+                                                size="small"
+                                                onClick={handleDisconnectSheets}
+                                                disabled={sheetsDisconnecting}
+                                            >
+                                                {sheetsDisconnecting
+                                                    ? <CircularProgress size={16} />
+                                                    : <DeleteIcon fontSize="small" />}
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                ) : (
+                                    <Typography variant="body2" color="text.secondary">
+                                        No Google account connected. Use the export button on the user list to connect one.
+                                    </Typography>
+                                )}
+                            </Box>
                         </Box>
                     )}
                 </DialogContent>

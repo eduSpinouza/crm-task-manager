@@ -5,7 +5,7 @@ import {
     Box, Button, Paper, Typography, Alert, CircularProgress,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
     Checkbox, TablePagination, FormControl, InputLabel, Select, MenuItem,
-    Chip, Tooltip,
+    Chip, Tooltip, Menu,
 } from '@mui/material';
 import axios from 'axios';
 import FollowUpDialog from './FollowUpDialog';
@@ -17,7 +17,10 @@ import IconButton from '@mui/material/IconButton';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { groupByUserId } from '@/lib/duplicateUtils';
+import { buildWorkbook, downloadXlsx, defaultFilename } from '@/lib/export/excelExport';
+import type { ExportUserData } from '@/lib/export/columns';
 
 interface UserData {
     taskId: number;
@@ -142,7 +145,7 @@ export default function UserListTable() {
     const [rows, setRows] = React.useState<UserData[]>([]);
     const [loading, setLoading] = React.useState(false);
     const [loadingEmails, setLoadingEmails] = React.useState(false);
-    const [rowCount, setRowCount] = React.useState(0);
+    const [loadProgress, setLoadProgress] = React.useState<{ phase: string; loaded: number; total: number }>({ phase: '', loaded: 0, total: 0 });
     const [page, setPage] = React.useState(0);
     const [pageSize, setPageSize] = React.useState(50);
     const [selected, setSelected] = React.useState<number[]>([]);
@@ -150,10 +153,13 @@ export default function UserListTable() {
     const [isDialogOpen, setIsDialogOpen] = React.useState(false);
     const [isEmailDialogOpen, setIsEmailDialogOpen] = React.useState(false);
     const [detailUser, setDetailUser] = React.useState<UserData | null>(null);
-    const [snackbar, setSnackbar] = React.useState<{ open: boolean, message: string, severity: 'success' | 'error' } | null>(null);
+    const [snackbar, setSnackbar] = React.useState<{ open: boolean, message: string, severity: 'success' | 'error', action?: React.ReactNode } | null>(null);
     // Filters
     const [filterAppName, setFilterAppName] = React.useState<string>('');
     const [filterOverdueDay, setFilterOverdueDay] = React.useState<string>('');
+    // Export state
+    const [exportMenuAnchor, setExportMenuAnchor] = React.useState<null | HTMLElement>(null);
+    const [exporting, setExporting] = React.useState(false);
     // Mirrored top scrollbar
     const topScrollRef = React.useRef<HTMLDivElement>(null);
     const tableContainerRef = React.useRef<HTMLDivElement>(null);
@@ -210,8 +216,13 @@ export default function UserListTable() {
         return { email: '', idNoUrl: '', livingNessUrl: '' };
     };
 
-    // Fetch emails for all rows with rate limiting
-    const fetchAllEmails = async (records: UserData[], token: string): Promise<UserData[]> => {
+    // Fetch emails for all rows with rate limiting.
+    // onProgress is optional — used by the export flow to drive a progress counter.
+    const fetchAllEmails = async (
+        records: UserData[],
+        token: string,
+        onProgress?: (loaded: number, total: number) => void
+    ): Promise<UserData[]> => {
         setLoadingEmails(true);
         const BATCH_SIZE = 5; // Concurrent requests
         const DELAY_MS = 100; // Delay between batches
@@ -229,6 +240,10 @@ export default function UserListTable() {
 
             await Promise.all(batchPromises);
 
+            if (onProgress) {
+                onProgress(Math.min(i + BATCH_SIZE, records.length), records.length);
+            }
+
             // Small delay between batches to avoid rate limiting
             if (i + BATCH_SIZE < records.length) {
                 await new Promise(resolve => setTimeout(resolve, DELAY_MS));
@@ -239,54 +254,88 @@ export default function UserListTable() {
         return results;
     };
 
-    const fetchUsers = React.useCallback(async () => {
-        setLoading(true);
-        try {
-            const token = localStorage.getItem('external_api_token');
-            if (!token) {
-                setLoading(false);
-                return;
-            }
-            const baseUrl = localStorage.getItem('api_base_url') || '';
+    // Fetch ALL pages from /api/users/list (for export). Does not affect the
+    // displayed table state. Uses size=200 to reduce round-trips.
+    const fetchAllPages = async (
+        token: string,
+        baseUrl: string,
+        onProgress?: (loaded: number, total: number) => void
+    ): Promise<UserData[]> => {
+        const PAGE_SIZE = 200;
+        let current = 1;
+        let totalCount = 0;
+        const allRecords: UserData[] = [];
 
+        do {
             const response = await axios.post('/api/users/list', {
-                current: page + 1,
-                size: pageSize,
+                current,
+                size: PAGE_SIZE,
             }, {
-                headers: { Authorization: token, 'X-API-Base-URL': baseUrl }
+                headers: { Authorization: token, 'X-API-Base-URL': baseUrl },
             });
 
+            if (!response.data?.success || !response.data?.data) break;
 
-            if (response.data?.success && response.data?.data) {
-                const records: UserData[] = Array.isArray(response.data.data.records)
-                    ? response.data.data.records
-                    : [];
-                setRowCount(Number(response.data.data.total) || 0);
+            const records: UserData[] = Array.isArray(response.data.data.records)
+                ? response.data.data.records
+                : [];
+            totalCount = Number(response.data.data.total) || 0;
 
-                // Fetch emails for all records before displaying
-                const enrichedRecords = await fetchAllEmails(records, token);
-                setRows(enrichedRecords);
-            } else {
-                console.error("Failed to fetch or invalid data", response.data);
-                setRows([]);
-                setRowCount(0);
-            }
-        } catch (error) {
-            console.error("Error fetching users", error);
-        } finally {
+            allRecords.push(...records);
+            if (onProgress) onProgress(allRecords.length, totalCount);
+
+            if (records.length < PAGE_SIZE) break;
+            current++;
+        } while (allRecords.length < totalCount);
+
+        return allRecords;
+    };
+
+    // Load all records once on mount (and on manual refresh).
+    // All pagination and filtering run client-side against this in-memory set.
+    const loadAllData = React.useCallback(async () => {
+        const token = localStorage.getItem('external_api_token');
+        if (!token) return;
+        const baseUrl = localStorage.getItem('api_base_url') || '';
+
+        setLoading(true);
+        setPage(0);
+        setLoadProgress({ phase: 'Fetching', loaded: 0, total: 0 });
+
+        let allRecords: UserData[] = [];
+        try {
+            allRecords = await fetchAllPages(token, baseUrl, (loaded, total) => {
+                setLoadProgress({ phase: 'Fetching', loaded, total });
+            });
+        } catch (err) {
+            console.error('Error fetching users', err);
             setLoading(false);
+            return;
         }
-    }, [page, pageSize]);
+
+        setLoading(false);
+        setLoadProgress({ phase: 'Enriching', loaded: 0, total: allRecords.length });
+
+        try {
+            const enriched = await fetchAllEmails(allRecords, token, (loaded, total) => {
+                setLoadProgress({ phase: 'Enriching', loaded, total });
+            });
+            setRows(enriched);
+        } catch (err) {
+            console.error('Error enriching users', err);
+            setRows(allRecords); // show un-enriched rows rather than nothing
+        }
+    }, []);
 
     React.useEffect(() => {
         if (hasToken) {
-            fetchUsers();
+            loadAllData();
         }
-    }, [fetchUsers, hasToken]);
+    }, [loadAllData, hasToken]);
 
     const handleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
         if (event.target.checked) {
-            setSelected(rows.map(row => row.taskId));
+            setSelected(filteredRows.map(row => row.taskId));
         } else {
             setSelected([]);
         }
@@ -300,7 +349,8 @@ export default function UserListTable() {
         });
     }, []);
 
-    const isSelected = (taskId: number) => selected.indexOf(taskId) !== -1;
+    const selectedSet = React.useMemo(() => new Set(selected), [selected]);
+    const isSelected = (taskId: number) => selectedSet.has(taskId);
 
     const handleChangePage = (_event: unknown, newPage: number) => {
         setPage(newPage);
@@ -317,7 +367,61 @@ export default function UserListTable() {
         setSnackbar({ open: true, message: 'Follow up(s) submitted successfully', severity: 'success' });
         setIsDialogOpen(false);
         setSelected([]);
-        fetchUsers();
+        loadAllData();
+    };
+
+    const handleExportClick = (sink: 'excel' | 'sheets') => (e: React.MouseEvent) => {
+        e.stopPropagation();
+        setExportMenuAnchor(null);
+        runExport(sink);
+    };
+
+    // Export uses the already-loaded, already-enriched filteredRows — no re-fetching needed.
+    const runExport = async (sink: 'excel' | 'sheets') => {
+        if (sink === 'excel') {
+            const wb = buildWorkbook(filteredRows as ExportUserData[]);
+            downloadXlsx(wb, defaultFilename());
+            setSnackbar({ open: true, message: `Exported ${filteredRows.length} rows to Excel`, severity: 'success' });
+            return;
+        }
+
+        // Google Sheets: POST already-enriched rows to the server-side route
+        setExporting(true);
+        try {
+            const res = await axios.post('/api/users/export-sheets', { rows: filteredRows });
+            const { url } = res.data;
+            setSnackbar({
+                open: true,
+                message: 'Exported to Google Sheets',
+                severity: 'success',
+                action: (
+                    <Button size="small" color="inherit" href={url} target="_blank" rel="noopener noreferrer">
+                        Open
+                    </Button>
+                ),
+            });
+        } catch (err: any) {
+            if (err.response?.data?.error === 'sheets_not_connected') {
+                const popup = window.open('/api/auth/sheets/start', 'sheets-oauth', 'width=520,height=620');
+                const onMessage = (event: MessageEvent) => {
+                    if (event.origin !== window.location.origin) return;
+                    if (event.data?.type !== 'sheets-oauth') return;
+                    window.removeEventListener('message', onMessage);
+                    popup?.close();
+                    if (event.data.status === 'success') {
+                        runExport('sheets');
+                    } else {
+                        setSnackbar({ open: true, message: `Google Sheets connection failed: ${event.data.detail}`, severity: 'error' });
+                    }
+                };
+                window.addEventListener('message', onMessage);
+                setSnackbar({ open: true, message: 'Connect your Google account to export to Sheets', severity: 'error' });
+            } else {
+                setSnackbar({ open: true, message: err.response?.data?.error || 'Failed to export to Google Sheets', severity: 'error' });
+            }
+        } finally {
+            setExporting(false);
+        }
     };
 
     // Apply filters
@@ -329,10 +433,16 @@ export default function UserListTable() {
         });
     }, [rows, filterAppName, filterOverdueDay]);
 
-    // Group by userId: duplicates float to the top
+    // Current page slice — pagination runs client-side against filteredRows
+    const displayRows = React.useMemo(
+        () => filteredRows.slice(page * pageSize, (page + 1) * pageSize),
+        [filteredRows, page, pageSize]
+    );
+
+    // Group by userId: duplicates float to the top of each page
     const { duplicateGroups, singleRows } = React.useMemo(
-        () => groupByUserId(filteredRows),
-        [filteredRows]
+        () => groupByUserId(displayRows),
+        [displayRows]
     );
 
     React.useEffect(() => {
@@ -346,6 +456,26 @@ export default function UserListTable() {
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
                 <Typography variant="h6">User List</Typography>
                 <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Button
+                        variant="outlined"
+                        startIcon={exporting ? <CircularProgress size={16} /> : <FileDownloadIcon />}
+                        disabled={loading || loadingEmails || exporting || rows.length === 0}
+                        onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                    >
+                        {exporting ? 'Exporting…' : 'Export'}
+                    </Button>
+                    <Menu
+                        anchorEl={exportMenuAnchor}
+                        open={Boolean(exportMenuAnchor)}
+                        onClose={() => setExportMenuAnchor(null)}
+                    >
+                        <MenuItem onClick={handleExportClick('excel')}>
+                            Download Excel (.xlsx)
+                        </MenuItem>
+                        <MenuItem onClick={handleExportClick('sheets')}>
+                            Export to Google Sheets
+                        </MenuItem>
+                    </Menu>
                     <Button
                         variant="outlined"
                         disabled={selected.length === 0}
@@ -405,19 +535,21 @@ export default function UserListTable() {
                         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4, gap: 2 }}>
                             <CircularProgress />
                             <Typography variant="body2" color="text.secondary">
-                                {loadingEmails ? 'Loading user details...' : 'Loading users...'}
+                                {loadProgress.total > 0
+                                    ? `${loadProgress.phase} ${loadProgress.loaded}/${loadProgress.total} rows…`
+                                    : `${loadProgress.phase || 'Loading'}…`}
                             </Typography>
                         </Box>
                     ) : (
                         <>
                         <TablePagination
                             component="div"
-                            count={rowCount}
+                            count={filteredRows.length}
                             page={page}
                             onPageChange={handleChangePage}
                             rowsPerPage={pageSize}
                             onRowsPerPageChange={handleChangeRowsPerPage}
-                            rowsPerPageOptions={[50, 100, 250]}
+                            rowsPerPageOptions={[50, 100, 250, 500]}
                         />
                         <Box
                             ref={topScrollRef}
@@ -478,7 +610,7 @@ export default function UserListTable() {
                                             onViewDetail={setDetailUser}
                                         />
                                     ))}
-                                    {filteredRows.length === 0 && (
+                                    {displayRows.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={COL_COUNT} align="center">
                                                 No data available
@@ -490,12 +622,12 @@ export default function UserListTable() {
                         </TableContainer>
                         <TablePagination
                             component="div"
-                            count={rowCount}
+                            count={filteredRows.length}
                             page={page}
                             onPageChange={handleChangePage}
                             rowsPerPage={pageSize}
                             onRowsPerPageChange={handleChangeRowsPerPage}
-                            rowsPerPageOptions={[50, 100, 250]}
+                            rowsPerPageOptions={[50, 100, 250, 500]}
                         />
                         </>
                     )}
@@ -505,7 +637,7 @@ export default function UserListTable() {
             <FollowUpDialog
                 open={isDialogOpen}
                 onClose={() => setIsDialogOpen(false)}
-                selectedTasks={rows.filter(r => selected.includes(r.taskId)).map(r => ({
+                selectedTasks={rows.filter(r => selectedSet.has(r.taskId)).map(r => ({
                     taskId: r.taskId,
                     orderId: r.orderId,
                     phone: r.phone,
@@ -528,7 +660,7 @@ export default function UserListTable() {
             <EmailDialog
                 open={isEmailDialogOpen}
                 onClose={() => setIsEmailDialogOpen(false)}
-                selectedUsers={rows.filter(r => selected.includes(r.taskId))}
+                selectedUsers={rows.filter(r => selectedSet.has(r.taskId))}
                 onSuccess={() => {
                     setSnackbar({ open: true, message: 'Emails sent successfully', severity: 'success' });
                     setIsEmailDialogOpen(false);
@@ -537,10 +669,11 @@ export default function UserListTable() {
 
             <Snackbar
                 open={!!snackbar?.open}
-                autoHideDuration={6000}
+                autoHideDuration={8000}
                 onClose={() => setSnackbar(null)}
+                action={snackbar?.action}
             >
-                <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity || 'info'}>
+                <Alert onClose={() => setSnackbar(null)} severity={snackbar?.severity || 'info'} action={snackbar?.action}>
                     {snackbar?.message}
                 </Alert>
             </Snackbar>
