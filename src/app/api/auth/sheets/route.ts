@@ -32,6 +32,19 @@ export async function DELETE(request: NextRequest) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
+    const acct = await getSheetsAccount(username);
+    if (acct?.refreshToken) {
+        // Best-effort revoke — don't fail the disconnect if Google rejects it
+        try {
+            await fetch(
+                `https://oauth2.googleapis.com/revoke?token=${encodeURIComponent(acct.refreshToken)}`,
+                { method: 'POST' }
+            );
+        } catch {
+            // ignore network errors
+        }
+    }
+
     await deleteSheetsAccount(username);
     return NextResponse.json({ success: true });
 }
