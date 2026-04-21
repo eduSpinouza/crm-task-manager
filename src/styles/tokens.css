@@ -1,0 +1,82 @@
+/* ============================================================ */
+/* Easy Cobro CRM — Design Tokens                                */
+/* Imported once at app root (src/app/globals.css).             */
+/* ============================================================ */
+
+:root {
+  /* ── Surfaces ────────────────────────────────────────────── */
+  --paper:   oklch(98.5% 0.004 85);  /* primary bg               */
+  --paper-2: oklch(96.5% 0.005 85);  /* secondary bg, hover      */
+  --paper-3: oklch(93%   0.006 85);  /* tertiary, placeholder    */
+
+  /* ── Text ────────────────────────────────────────────────── */
+  --ink:   oklch(22% 0.01  260);     /* primary                  */
+  --ink-2: oklch(40% 0.01  260);     /* secondary                */
+  --ink-3: oklch(58% 0.008 260);     /* tertiary / caption       */
+
+  /* ── Lines ───────────────────────────────────────────────── */
+  --line:   oklch(88% 0.006 85);     /* primary borders          */
+  --line-2: oklch(92% 0.005 85);     /* subtle dividers          */
+
+  /* ── Accent (indigo) ─────────────────────────────────────── */
+  --accent:      oklch(55% 0.15 258);
+  --accent-soft: oklch(94% 0.04 258);
+
+  /* ── Warn (amber) — edit mode, mid-overdue ───────────────── */
+  --warn:      oklch(72% 0.15 70);
+  --warn-ink:  oklch(45% 0.15 70);
+  --warn-soft: oklch(95% 0.06 70);
+
+  /* ── Danger (red) — overdue, destructive ─────────────────── */
+  --danger:      oklch(58% 0.19 25);
+  --danger-soft: oklch(94% 0.05 25);
+
+  /* ── Good (green) — success, resolved ────────────────────── */
+  --good:      oklch(62% 0.14 150);
+  --good-ink:  oklch(35% 0.10 150);
+  --good-soft: oklch(94% 0.05 150);
+
+  /* ── Type families ───────────────────────────────────────── */
+  --font-sans:    'Inter', system-ui, -apple-system, sans-serif;
+  --font-display: 'Instrument Serif', 'Iowan Old Style', Georgia, serif;
+  --font-mono:    'JetBrains Mono', ui-monospace, Menlo, monospace;
+
+  /* ── Type scale ──────────────────────────────────────────── */
+  --fs-display: 32px;
+  --fs-h1:      26px;
+  --fs-h2:      18px;
+  --fs-body:    14px;
+  --fs-small:   13px;
+  --fs-button:  12px;
+  --fs-label:   11px;
+  --fs-eyebrow: 10px;
+
+  /* ── Spacing (multiples of 4) ────────────────────────────── */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 20px;
+  --s-6: 24px;
+  --s-7: 28px;
+  --s-8: 32px;
+  --s-10: 40px;
+  --s-12: 48px;
+
+  /* ── Radius ──────────────────────────────────────────────── */
+  --r-sm: 3px;
+  --r-md: 4px;
+  --r-lg: 6px;
+
+  /* ── Shadow ──────────────────────────────────────────────── */
+  --shadow-modal: 0 20px 60px rgba(0, 0, 0, 0.25);
+
+  /* ── Motion ──────────────────────────────────────────────── */
+  --ease:     cubic-bezier(0.2, 0, 0, 1);
+  --dur-fast: 120ms;
+  --dur-base: 180ms;
+
+  /* ── Focus ring ──────────────────────────────────────────── */
+  --focus-ring:   2px solid var(--accent);
+  --focus-offset: 2px;
+}
