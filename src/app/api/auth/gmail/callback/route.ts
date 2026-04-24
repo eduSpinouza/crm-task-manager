@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { addAccount } from '@/lib/emailAccounts';
+import { addAccount, listAccounts, updateAccount } from '@/lib/emailAccounts';
 
 export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
@@ -67,10 +67,18 @@ export async function GET(request: NextRequest) {
             return htmlClose('error', 'Could not retrieve Gmail address from Google.');
         }
 
-        await addAccount(username, {
-            email: userInfo.email,
-            refreshToken,
-        });
+        // Upsert: update the refresh token if this email is already connected,
+        // otherwise create a new account entry.
+        const existing = await listAccounts(username);
+        const match = existing.find(a => a.email === userInfo.email);
+        if (match) {
+            await updateAccount(username, match.id, { refreshToken });
+        } else {
+            await addAccount(username, {
+                email: userInfo.email,
+                refreshToken,
+            });
+        }
 
         return htmlClose('success', userInfo.email);
     } catch (err: any) {
