@@ -26,11 +26,18 @@ export async function GET(request: NextRequest) {
 
         const authToken = token.startsWith('Bear ') ? token : `Bear ${token}`;
 
-        const response = await axios.get(targetUrl, {
+        const workerUrl = process.env.CLOUDFLARE_WORKER_URL ?? targetUrl;
+        const workerSecret = process.env.CLOUDFLARE_WORKER_SECRET;
+
+        const response = await axios.get(workerUrl, {
             headers: {
                 'Authentication': authToken,
                 'Accept': 'application/json',
-                'Cookie': `Admin-Token=${token}`
+                'Cookie': `Admin-Token=${token}`,
+                ...(workerUrl !== targetUrl && workerSecret && {
+                    'X-Target-URL': targetUrl,
+                    'X-Worker-Secret': workerSecret,
+                }),
             }
         });
 

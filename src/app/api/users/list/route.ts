@@ -22,8 +22,11 @@ export async function POST(request: NextRequest) {
         // The external API uses 'authentication' header with 'Bear ' prefix
         const authToken = token.startsWith('Bear ') ? token : `Bear ${token}`;
 
+        const workerUrl = process.env.CLOUDFLARE_WORKER_URL ?? targetUrl;
+        const workerSecret = process.env.CLOUDFLARE_WORKER_SECRET;
+
         const response = await axios.post(
-            targetUrl,
+            workerUrl,
             {
                 productName: body.productName ?? null,
                 followResult: body.followResult ?? null,
@@ -45,7 +48,11 @@ export async function POST(request: NextRequest) {
                     'Authentication': authToken,
                     'Content-Type': 'application/json',
                     'Accept': 'application/json',
-                    'Cookie': `Admin-Token=${token}`
+                    'Cookie': `Admin-Token=${token}`,
+                    ...(workerUrl !== targetUrl && workerSecret && {
+                        'X-Target-URL': targetUrl,
+                        'X-Worker-Secret': workerSecret,
+                    }),
                 }
             }
         );

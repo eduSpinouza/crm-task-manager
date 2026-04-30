@@ -34,6 +34,11 @@ export async function POST(request: NextRequest) {
         const targetUrl = `${baseUrl}/api/manage/urge/task/addFollow?v=${v}`;
 
         const authToken = token.startsWith('Bear ') ? token : `Bear ${token}`;
+        const workerUrl = process.env.CLOUDFLARE_WORKER_URL ?? targetUrl;
+        const workerSecret = process.env.CLOUDFLARE_WORKER_SECRET;
+        const workerHeaders = workerUrl !== targetUrl && workerSecret
+            ? { 'X-Target-URL': targetUrl, 'X-Worker-Secret': workerSecret }
+            : {};
 
         for (const task of tasks) {
             await delay(500);
@@ -73,14 +78,15 @@ export async function POST(request: NextRequest) {
 
             try {
                 const response = await axios.post(
-                    targetUrl,
+                    workerUrl,
                     payload,
                     {
                         headers: {
                             'Authentication': authToken,
                             'Content-Type': 'application/json',
                             'Accept': 'application/json',
-                            'Cookie': `Admin-Token=${token}`
+                            'Cookie': `Admin-Token=${token}`,
+                            ...workerHeaders,
                         }
                     }
                 );
