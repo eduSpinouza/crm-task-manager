@@ -66,7 +66,7 @@ export default function AboutPage() {
                     color="primary.main"
                     sx={{ letterSpacing: '-0.5px' }}
                 >
-                    CRM Task Manager
+                    CobraYa!
                 </Typography>
                 <Button
                     component={Link}
@@ -225,7 +225,7 @@ export default function AboutPage() {
                         }}
                     >
                         <Typography variant="body2" color="text.secondary">
-                            © {new Date().getFullYear()} CRM Task Manager. All rights reserved.
+                            © {new Date().getFullYear()} CobraYa!. All rights reserved.
                         </Typography>
                         <Box sx={{ display: 'flex', gap: 3 }}>
                             <Typography

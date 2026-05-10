@@ -9,7 +9,7 @@ import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 const CONTACT_EMAIL = 'eduardo.espinoza.sm@gmail.com';
 const APP_URL = 'https://crm-task-manager-three.vercel.app';
-const LAST_UPDATED = 'May 6, 2026';
+const LAST_UPDATED = 'May 10, 2026';
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
     return (
@@ -64,7 +64,7 @@ export default function PrivacyPage() {
                 }}
             >
                 <Typography variant="h6" fontWeight={700} color="primary.main">
-                    CRM Task Manager
+                    CobraYa!
                 </Typography>
                 <Button
                     component={Link}
@@ -98,7 +98,7 @@ export default function PrivacyPage() {
                 {/* 1 */}
                 <Section title="1. Overview">
                     <P>
-                        CRM Task Manager (&quot;the App&quot;, &quot;we&quot;, &quot;us&quot;) is a web-based
+                        CobraYa! (&quot;the App&quot;, &quot;we&quot;, &quot;us&quot;) is a web-based
                         customer relationship management tool designed to help debt collection teams manage
                         debtors, track follow-up tasks, and send collection emails. This Privacy Policy explains
                         how we collect, use, and protect your information when you use the App, including when
@@ -209,7 +209,7 @@ export default function PrivacyPage() {
                         }}
                     >
                         <Typography variant="body2" color="text.secondary" lineHeight={1.8}>
-                            <strong>Google API Limited Use Disclosure:</strong> CRM Task Manager&apos;s use of
+                            <strong>Google API Limited Use Disclosure:</strong> CobraYa!&apos;s use of
                             information received from Google APIs will adhere to the{' '}
                             <Typography
                                 component="a"
@@ -328,7 +328,7 @@ export default function PrivacyPage() {
 
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 2 }}>
                     <Typography variant="body2" color="text.secondary">
-                        © {new Date().getFullYear()} CRM Task Manager
+                        © {new Date().getFullYear()} CobraYa!
                     </Typography>
                     <Button
                         component={Link}
