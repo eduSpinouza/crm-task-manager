@@ -3,8 +3,11 @@ import type { Metadata } from "next";
 import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
 
 export const metadata: Metadata = {
-  title: "CRM Task Manager",
-  description: "User management and follow-up system",
+  title: "CobraYa!",
+  description: "Debt collection CRM for teams. Manage debtors, track follow-ups, and send emails.",
+  verification: {
+    google: "2vfBRbR67CCsbhL7Z9tCIwzGxVeMzaa_XUB8ecZM9Sk",
+  },
 };
 
 export default function RootLayout({
