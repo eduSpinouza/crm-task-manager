@@ -61,7 +61,7 @@ export async function POST(request: NextRequest) {
         }
 
         const emailService = new EmailService({
-            provider: 'gmail-oauth',
+            provider: 'gmail-rest',
             user: account.email,
             clientId,
             clientSecret,

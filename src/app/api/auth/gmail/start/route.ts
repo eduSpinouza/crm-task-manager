@@ -3,7 +3,7 @@ import { verifyJWT } from '@/lib/auth';
 import { randomBytes } from 'crypto';
 
 const SCOPES = [
-    'https://mail.google.com/',
+    'https://www.googleapis.com/auth/gmail.send',
     'openid',
     'email',
 ].join(' ');
