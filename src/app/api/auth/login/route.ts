@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { authenticateUserAsync, createSession, signJWT, logLoginEvent } from '@/lib/auth';
+import { isLicenseExpired } from '@/lib/licenseUtils';
 
 export async function POST(request: NextRequest) {
     try {
@@ -19,6 +20,14 @@ export async function POST(request: NextRequest) {
         if (!user) {
             await logLoginEvent(username, ip, userAgent, false);
             return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 });
+        }
+
+        if (isLicenseExpired(user.license)) {
+            await logLoginEvent(user.username, ip, userAgent, false);
+            return NextResponse.json(
+                { error: 'Your license has expired. Please contact your administrator to renew.' },
+                { status: 403 }
+            );
         }
 
         // Log successful login before creating session
