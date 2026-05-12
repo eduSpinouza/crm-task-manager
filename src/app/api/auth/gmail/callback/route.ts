@@ -67,8 +67,6 @@ export async function GET(request: NextRequest) {
             return htmlClose('error', 'Could not retrieve Gmail address from Google.');
         }
 
-        // Upsert: update the refresh token if this email is already connected,
-        // otherwise create a new account entry.
         const existing = await listAccounts(username);
         const match = existing.find(a => a.email === userInfo.email);
         if (match) {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
-    verifyJWT, listUsersAsync, createUser, deleteUserAsync, setUserBlocked,
+    verifyJWT, listUsersAsync, createUser, deleteUserAsync, setUserBlocked, setUserLicense,
     getLoginHistory, getKickHistory, sessionStore, destroySession, type UserRole,
 } from '@/lib/auth';
 
@@ -38,6 +38,7 @@ export async function GET(request: NextRequest) {
                 createdAt: u.createdAt,
                 createdBy: u.createdBy,
                 blocked: u.blocked ?? false,
+                license: u.license ?? null,
                 currentSession: currentSession ?? null,
                 loginHistory,
                 kickHistory,
@@ -143,10 +144,34 @@ export async function PATCH(request: NextRequest) {
 
     try {
         const body = await request.json();
-        const { username, blocked } = body;
+        const { username, blocked, action, durationDays } = body;
 
-        if (!username || typeof blocked !== 'boolean') {
-            return NextResponse.json({ error: 'username and blocked (boolean) are required' }, { status: 400 });
+        if (!username) {
+            return NextResponse.json({ error: 'username is required' }, { status: 400 });
+        }
+
+        if (action === 'setLicense') {
+            const validPresets = [30, 60, 90, 180, 365];
+            if (!durationDays || !validPresets.includes(durationDays)) {
+                return NextResponse.json(
+                    { error: 'durationDays must be one of: 30, 60, 90, 180, 365' },
+                    { status: 400 }
+                );
+            }
+            let resolvedStartDate: number | undefined;
+            if (body.startDate !== undefined) {
+                const parsed = Number(body.startDate);
+                if (!Number.isFinite(parsed) || parsed <= 0) {
+                    return NextResponse.json({ error: 'startDate must be a valid timestamp' }, { status: 400 });
+                }
+                resolvedStartDate = parsed;
+            }
+            await setUserLicense(username, durationDays, resolvedStartDate);
+            return NextResponse.json({ success: true, message: `License set for "${username}": ${durationDays} days` });
+        }
+
+        if (typeof blocked !== 'boolean') {
+            return NextResponse.json({ error: 'blocked (boolean) or a valid action is required' }, { status: 400 });
         }
 
         if (username === admin.userId) {

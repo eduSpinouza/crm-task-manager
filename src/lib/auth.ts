@@ -1,5 +1,6 @@
 import { createHmac, randomBytes, timingSafeEqual, scryptSync } from 'crypto';
 import { Redis } from '@upstash/redis';
+import { type LicenseConfig } from './licenseUtils';
 
 // ============================================================
 // Password Hashing (scrypt - Node.js built-in, no dependencies)
@@ -293,6 +294,7 @@ export interface UserConfig {
     createdAt?: number;
     createdBy?: string;
     blocked?: boolean;
+    license?: LicenseConfig;
 }
 
 // Get a Redis client for user storage (reuse session store's Redis if available)
@@ -512,4 +514,23 @@ export async function setUserBlocked(username: string, blocked: boolean): Promis
     }
 
     await redis.set(userKey(username), { ...user, blocked });
+}
+
+export async function setUserLicense(username: string, durationDays: number, startDate?: number): Promise<void> {
+    const redis = getUserRedis();
+    if (!redis) {
+        throw new Error('Redis is required for user management.');
+    }
+
+    const user = await redis.get<UserConfig>(userKey(username));
+    if (!user) {
+        throw new Error(`User "${username}" not found`);
+    }
+
+    const license: LicenseConfig = {
+        startDate: startDate ?? Date.now(),
+        durationDays,
+    };
+
+    await redis.set(userKey(username), { ...user, license });
 }

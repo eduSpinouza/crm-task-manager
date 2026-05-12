@@ -1,6 +1,7 @@
 import { EmailProvider, EmailSendResult } from './EmailProvider';
 import { GmailProvider } from './providers/GmailProvider';
 import { GmailOAuthProvider } from './providers/GmailOAuthProvider';
+import { GmailRestProvider } from './providers/GmailRestProvider';
 import { replacePlaceholders } from '../templateUtils';
 
 export interface UserData {
@@ -17,6 +18,14 @@ export interface UserData {
 
 export type EmailServiceConfig =
     | {
+          provider: 'gmail-rest';
+          user: string;
+          clientId: string;
+          clientSecret: string;
+          refreshToken: string;
+      }
+    | {
+          // Legacy SMTP OAuth path — kept for rollback safety
           provider: 'gmail-oauth';
           user: string;
           clientId: string;
@@ -34,6 +43,14 @@ export class EmailService {
 
     constructor(config: EmailServiceConfig) {
         switch (config.provider) {
+            case 'gmail-rest':
+                this.provider = new GmailRestProvider({
+                    user: config.user,
+                    clientId: config.clientId,
+                    clientSecret: config.clientSecret,
+                    refreshToken: config.refreshToken,
+                });
+                break;
             case 'gmail-oauth':
                 this.provider = new GmailOAuthProvider({
                     user: config.user,

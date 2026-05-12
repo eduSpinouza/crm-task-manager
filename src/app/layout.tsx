@@ -3,8 +3,11 @@ import "./globals.css";
 import ThemeRegistry from '@/components/ThemeRegistry/ThemeRegistry';
 
 export const metadata: Metadata = {
-  title: "Easy Cobro",
-  description: "Debt collection CRM",
+  title: "CobraYa!",
+  description: "Debt collection CRM for teams. Manage debtors, track follow-ups, and send emails.",
+  verification: {
+    google: "2vfBRbR67CCsbhL7Z9tCIwzGxVeMzaa_XUB8ecZM9Sk",
+  },
 };
 
 export default function RootLayout({
