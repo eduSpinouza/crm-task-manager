@@ -1,6 +1,6 @@
 'use client';
 // ============================================================
-// Easy Cobro CRM — MUI v5 Theme Override
+// CobraYa! CRM — MUI v5 Theme Override
 // Wraps the app via ThemeRegistry → ThemeProvider.
 // Pairs with src/styles/tokens.css — both must be loaded.
 // ============================================================

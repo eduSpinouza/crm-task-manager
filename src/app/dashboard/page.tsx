@@ -81,22 +81,57 @@ export default function DashboardPage() {
     return (
         <Box sx={{ flexGrow: 1 }}>
             <AppBar position="static">
-                <Toolbar>
-                    <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-                        CRM Dashboard
-                    </Typography>
+                <Toolbar sx={{ gap: 1, minHeight: '52px !important', px: '20px !important' }}>
+                    {/* Brand */}
+                    <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                        <Typography
+                            sx={{
+                                fontFamily: 'var(--font-display)',
+                                fontSize: 20,
+                                lineHeight: 1,
+                                letterSpacing: '-0.01em',
+                                color: 'var(--ink)',
+                            }}
+                        >
+                            Cobra
+                            <Box component="em" sx={{ color: 'var(--accent)', fontStyle: 'italic' }}>Ya!</Box>
+                        </Typography>
+                        {currentUsername && (
+                            <Typography
+                                sx={{
+                                    font: '500 10px var(--font-mono)',
+                                    letterSpacing: '0.06em',
+                                    textTransform: 'uppercase',
+                                    color: 'var(--ink-3)',
+                                    mt: '2px',
+                                }}
+                            >
+                                {currentUsername}
+                            </Typography>
+                        )}
+                    </Box>
+
+                    {/* Actions */}
                     {userRole === 'admin' && (
                         <Button
-                            color="inherit"
                             startIcon={<PeopleIcon />}
                             onClick={() => setUsersDialogOpen(true)}
-                            sx={{ mr: 1 }}
+                            sx={{ color: 'var(--ink-2)', fontSize: 12 }}
                         >
-                            Manage Users
+                            Users
                         </Button>
                     )}
                     <TokenSettings />
-                    <Button color="inherit" onClick={handleLogout}>Logout</Button>
+                    <Button
+                        onClick={handleLogout}
+                        sx={{
+                            color: 'var(--ink-3)',
+                            fontSize: 12,
+                            '&:hover': { color: 'var(--danger)' },
+                        }}
+                    >
+                        Sign out
+                    </Button>
                 </Toolbar>
             </AppBar>
             <LicenseBanner daysLeft={licenseDaysLeft} status={licenseStatus} />

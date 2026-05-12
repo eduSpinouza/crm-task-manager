@@ -85,7 +85,7 @@ function LoginForm() {
                 {/* Heading */}
                 <Typography
                     sx={{
-                        fontFamily: 'var(--font-serif)',
+                        fontFamily: 'var(--font-display)',
                         fontSize: 32,
                         lineHeight: 1,
                         letterSpacing: '-0.01em',
@@ -234,19 +234,19 @@ export default function LoginPage() {
                             mb: '18px',
                         }}
                     >
-                        Easy Cobro · collections CRM
+                        CobraYa! · collections CRM
                     </Typography>
                     <Typography
                         sx={{
-                            fontFamily: 'var(--font-serif)',
+                            fontFamily: 'var(--font-display)',
                             fontSize: 44,
                             lineHeight: 1,
                             letterSpacing: '-0.015em',
                             color: 'var(--ink)',
                         }}
                     >
-                        Cobro
-                        <Box component="em" sx={{ color: 'var(--accent)', fontStyle: 'italic' }}>.</Box>
+                        Cobra
+                        <Box component="em" sx={{ color: 'var(--accent)', fontStyle: 'italic' }}>Ya!</Box>
                     </Typography>
                 </Box>
 
@@ -254,7 +254,7 @@ export default function LoginPage() {
                 <Box>
                     <Typography
                         sx={{
-                            fontFamily: 'var(--font-serif)',
+                            fontFamily: 'var(--font-display)',
                             fontSize: 28,
                             lineHeight: 1.2,
                             letterSpacing: '-0.01em',
@@ -304,7 +304,7 @@ export default function LoginPage() {
                         justifyContent: 'space-between',
                     }}
                 >
-                    <span>v0.1 · Apr 2026</span>
+                    <span>v0.1 · May 2026</span>
                     <span>Mexico · Peru · Colombia · Chile</span>
                 </Box>
             </Box>
