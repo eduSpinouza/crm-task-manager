@@ -17,6 +17,9 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import IconButton from '@mui/material/IconButton';
 import DeleteIcon from '@mui/icons-material/Delete';
+import EditIcon from '@mui/icons-material/Edit';
+import CheckIcon from '@mui/icons-material/Check';
+import CloseIcon from '@mui/icons-material/Close';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import PeopleIcon from '@mui/icons-material/People';
 import CardMembershipIcon from '@mui/icons-material/CardMembership';
@@ -61,6 +64,11 @@ export default function UserManagementDialog({ open, onClose }: Props) {
 
     // Delete confirmation
     const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
+
+    // Rename
+    const [renameTarget, setRenameTarget] = React.useState<string | null>(null);
+    const [renameValue, setRenameValue] = React.useState('');
+    const [renaming, setRenaming] = React.useState(false);
 
     // License management
     const [licenseTarget, setLicenseTarget] = React.useState<string | null>(null);
@@ -114,6 +122,27 @@ export default function UserManagementDialog({ open, onClose }: Props) {
             setError(err.response?.data?.error || 'Failed to create user');
         } finally {
             setCreating(false);
+        }
+    };
+
+    const handleRename = async () => {
+        if (!renameTarget || !renameValue.trim()) return;
+        setRenaming(true);
+        setError('');
+        try {
+            await axios.patch('/api/admin/users', {
+                username: renameTarget,
+                action: 'rename',
+                newUsername: renameValue.trim(),
+            });
+            setSuccess(`User renamed to "${renameValue.trim()}"`);
+            setRenameTarget(null);
+            setRenameValue('');
+            fetchUsers();
+        } catch (err: any) {
+            setError(err.response?.data?.error || 'Failed to rename user');
+        } finally {
+            setRenaming(false);
         }
     };
 
@@ -211,7 +240,32 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                 <TableBody>
                                     {users.map((user) => (
                                         <TableRow key={user.username}>
-                                            <TableCell>{user.username}</TableCell>
+                                            <TableCell>
+                                                {renameTarget === user.username ? (
+                                                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                                                        <TextField
+                                                            size="small"
+                                                            value={renameValue}
+                                                            onChange={(e) => setRenameValue(e.target.value)}
+                                                            onKeyDown={(e) => {
+                                                                if (e.key === 'Enter') handleRename();
+                                                                if (e.key === 'Escape') { setRenameTarget(null); setRenameValue(''); }
+                                                            }}
+                                                            autoFocus
+                                                            inputProps={{ style: { padding: '4px 8px' } }}
+                                                            sx={{ width: 140 }}
+                                                        />
+                                                        <IconButton size="small" color="primary" onClick={handleRename} disabled={renaming || !renameValue.trim()}>
+                                                            <CheckIcon fontSize="small" />
+                                                        </IconButton>
+                                                        <IconButton size="small" onClick={() => { setRenameTarget(null); setRenameValue(''); }}>
+                                                            <CloseIcon fontSize="small" />
+                                                        </IconButton>
+                                                    </Box>
+                                                ) : (
+                                                    user.username
+                                                )}
+                                            </TableCell>
                                             <TableCell>
                                                 <Chip
                                                     label={user.role}
@@ -243,12 +297,25 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                                     <Box sx={{ display: 'inline-flex', gap: 0.5 }}>
                                                         <IconButton
                                                             size="small"
+                                                            onClick={() => {
+                                                                setRenameTarget(user.username);
+                                                                setRenameValue(user.username);
+                                                                setLicenseTarget(null);
+                                                                setShowForm(false);
+                                                            }}
+                                                            title="Rename user"
+                                                        >
+                                                            <EditIcon fontSize="small" />
+                                                        </IconButton>
+                                                        <IconButton
+                                                            size="small"
                                                             color="primary"
                                                             onClick={() => {
                                                                 setLicenseTarget(user.username);
                                                                 setSelectedDays(30);
                                                                 setLicenseStartDate(todayISO);
                                                                 setShowForm(false);
+                                                                setRenameTarget(null);
                                                             }}
                                                             title="Set license"
                                                         >
