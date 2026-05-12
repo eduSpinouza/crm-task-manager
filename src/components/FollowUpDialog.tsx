@@ -2,8 +2,9 @@
 
 import * as React from 'react';
 import {
-    Dialog, DialogTitle, DialogContent, DialogActions,
-    Button, TextField, MenuItem, Select, InputLabel, FormControl, CircularProgress
+    Dialog, DialogContent, DialogActions,
+    Button, CircularProgress, Box, Typography,
+    ToggleButton, ToggleButtonGroup,
 } from '@mui/material';
 import axios from 'axios';
 
@@ -24,7 +25,6 @@ interface FollowUpDialogProps {
     onSuccess: () => void;
 }
 
-// Follow-Up Result options based on target
 const SELF_RESULTS = [
     { value: 1, label: 'PTP' },
     { value: 2, label: 'Financial difficult' },
@@ -41,18 +41,55 @@ const CONTACT_RESULTS = [
     { value: 6, label: 'Bad attitude' },
 ];
 
+const TARGETS = [
+    { value: 0, label: 'Self' },
+    { value: 1, label: 'Emergency 1' },
+    { value: 2, label: 'Emergency 2' },
+    { value: 3, label: 'Contacts' },
+];
+
+const toggleSx = {
+    flexWrap: 'wrap',
+    gap: 0.5,
+    '& .MuiToggleButtonGroup-grouped': {
+        border: '1px solid var(--line) !important',
+        borderRadius: '3px !important',
+        mx: 0,
+    },
+} as const;
+
+const toggleBtnSx = {
+    font: '500 11px var(--font-sans)',
+    px: 1.5,
+    py: 0.5,
+    color: 'var(--ink-2)',
+    textTransform: 'none',
+    '&.Mui-selected': {
+        bgcolor: 'var(--accent)',
+        color: '#fff',
+        borderColor: 'var(--accent) !important',
+        '&:hover': { bgcolor: 'var(--accent)' },
+    },
+} as const;
+
+const sectionLabelSx = {
+    font: '500 10px var(--font-mono)',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase',
+    color: 'var(--ink-3)',
+    mb: 1,
+} as const;
+
 export default function FollowUpDialog({ open, onClose, selectedTasks, onSuccess }: FollowUpDialogProps) {
     const [note, setNote] = React.useState('');
     const [followTarget, setFollowTarget] = React.useState<number>(0);
-    const [followResult, setFollowResult] = React.useState<number>(3); // Default: Missed
+    const [followResult, setFollowResult] = React.useState<number>(3);
     const [loading, setLoading] = React.useState(false);
 
-    // Get result options based on selected target
     const resultOptions = followTarget === 0 ? SELF_RESULTS : CONTACT_RESULTS;
 
-    // Reset followResult when target changes - default to Missed (3) which exists in all option sets
     React.useEffect(() => {
-        setFollowResult(3); // Missed
+        setFollowResult(3);
     }, [followTarget]);
 
     const handleSubmit = async () => {
@@ -80,52 +117,110 @@ export default function FollowUpDialog({ open, onClose, selectedTasks, onSuccess
 
     return (
         <Dialog open={open} onClose={onClose} fullWidth maxWidth="sm">
-            <DialogTitle>Add Follow Up ({selectedTasks.length} selected)</DialogTitle>
-            <DialogContent>
-                <FormControl fullWidth margin="dense">
-                    <InputLabel>Follow-up Target</InputLabel>
-                    <Select
+            {/* Title */}
+            <Box sx={{ px: 3, pt: 3, pb: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5, mb: 2.5 }}>
+                    <Typography
+                        sx={{
+                            fontFamily: 'var(--font-display)',
+                            fontSize: 22,
+                            lineHeight: 1,
+                            color: 'var(--ink)',
+                        }}
+                    >
+                        Follow up
+                    </Typography>
+                    <Box
+                        sx={{
+                            font: '500 10px var(--font-mono)',
+                            letterSpacing: '0.06em',
+                            textTransform: 'uppercase',
+                            color: 'var(--ink-3)',
+                            bgcolor: 'var(--paper-2)',
+                            border: '1px solid var(--line)',
+                            borderRadius: '3px',
+                            px: '6px',
+                            py: '2px',
+                        }}
+                    >
+                        {selectedTasks.length} task{selectedTasks.length !== 1 ? 's' : ''}
+                    </Box>
+                </Box>
+            </Box>
+
+            <DialogContent sx={{ pt: 0 }}>
+                {/* Target */}
+                <Box sx={{ mb: 3 }}>
+                    <Typography sx={sectionLabelSx}>Target</Typography>
+                    <ToggleButtonGroup
                         value={followTarget}
-                        label="Follow-up Target"
-                        onChange={(e) => setFollowTarget(e.target.value as number)}
+                        exclusive
+                        onChange={(_, v) => { if (v !== null) setFollowTarget(v); }}
+                        size="small"
+                        sx={toggleSx}
                     >
-                        <MenuItem value={0}>Self</MenuItem>
-                        <MenuItem value={1}>Emergency Contact 1</MenuItem>
-                        <MenuItem value={2}>Emergency Contact 2</MenuItem>
-                        <MenuItem value={3}>Contacts</MenuItem>
-                    </Select>
-                </FormControl>
-
-                <FormControl fullWidth margin="dense">
-                    <InputLabel>Follow-up Result</InputLabel>
-                    <Select
-                        value={followResult}
-                        label="Follow-up Result"
-                        onChange={(e) => setFollowResult(e.target.value as number)}
-                    >
-                        {resultOptions.map((option) => (
-                            <MenuItem key={option.value} value={option.value}>
-                                {option.label}
-                            </MenuItem>
+                        {TARGETS.map(({ value, label }) => (
+                            <ToggleButton key={value} value={value} sx={toggleBtnSx}>
+                                {label}
+                            </ToggleButton>
                         ))}
-                    </Select>
-                </FormControl>
+                    </ToggleButtonGroup>
+                </Box>
 
-                <TextField
-                    autoFocus
-                    margin="dense"
-                    label="Note"
-                    fullWidth
-                    multiline
-                    rows={4}
-                    value={note}
-                    onChange={(e) => setNote(e.target.value)}
-                />
+                {/* Result */}
+                <Box sx={{ mb: 3 }}>
+                    <Typography sx={sectionLabelSx}>Result</Typography>
+                    <ToggleButtonGroup
+                        value={followResult}
+                        exclusive
+                        onChange={(_, v) => { if (v !== null) setFollowResult(v); }}
+                        size="small"
+                        sx={toggleSx}
+                    >
+                        {resultOptions.map(({ value, label }) => (
+                            <ToggleButton key={value} value={value} sx={toggleBtnSx}>
+                                {label}
+                            </ToggleButton>
+                        ))}
+                    </ToggleButtonGroup>
+                </Box>
+
+                {/* Note */}
+                <Box>
+                    <Typography sx={sectionLabelSx}>Note</Typography>
+                    <Box
+                        component="textarea"
+                        value={note}
+                        placeholder="Optional note…"
+                        onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setNote(e.target.value)}
+                        rows={3}
+                        sx={{
+                            width: '100%',
+                            border: '1px solid var(--line)',
+                            borderRadius: 'var(--r-md)',
+                            background: 'var(--paper-2)',
+                            resize: 'none',
+                            p: '10px 12px',
+                            fontSize: 14,
+                            color: 'var(--ink)',
+                            fontFamily: 'var(--font-sans)',
+                            outline: 0,
+                            display: 'block',
+                            transition: 'border-color 120ms',
+                            '&::placeholder': { color: 'var(--ink-3)' },
+                            '&:hover': { borderColor: 'var(--ink-3)' },
+                            '&:focus': { borderColor: 'var(--accent)', borderWidth: '2px', background: 'var(--paper)' },
+                        }}
+                    />
+                </Box>
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose} disabled={loading}>Cancel</Button>
-                <Button onClick={handleSubmit} variant="contained" disabled={loading}>
-                    {loading ? <CircularProgress size={24} /> : 'Submit'}
+
+            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+                <Button onClick={onClose} disabled={loading} sx={{ color: 'var(--ink-3)' }}>
+                    Cancel
+                </Button>
+                <Button variant="contained" onClick={handleSubmit} disabled={loading} sx={{ minWidth: 100 }}>
+                    {loading ? <CircularProgress size={16} sx={{ color: 'inherit' }} /> : 'Submit →'}
                 </Button>
             </DialogActions>
         </Dialog>

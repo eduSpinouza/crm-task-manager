@@ -136,15 +136,29 @@ export default function DashboardPage() {
             </AppBar>
             <LicenseBanner daysLeft={licenseDaysLeft} status={licenseStatus} />
             {(userRole === 'admin' || licenseStatus !== 'none') && (
-                <Box sx={{ borderBottom: 1, borderColor: 'divider', bgcolor: 'background.paper', display: 'flex', alignItems: 'center' }}>
+                <Box sx={{ borderBottom: '1px solid var(--line)', bgcolor: 'var(--paper)', display: 'flex', alignItems: 'center' }}>
                     {userRole === 'admin' ? (
                         <Tabs
                             value={currentTab}
                             onChange={(_, v) => setCurrentTab(v)}
-                            sx={{ px: 3, flexGrow: 1 }}
+                            sx={{
+                                px: '20px',
+                                flexGrow: 1,
+                                minHeight: 40,
+                                '& .MuiTab-root': {
+                                    fontSize: 12,
+                                    fontWeight: 500,
+                                    minHeight: 40,
+                                    textTransform: 'none',
+                                    color: 'var(--ink-3)',
+                                    py: 0,
+                                },
+                                '& .Mui-selected': { color: 'var(--ink) !important' },
+                                '& .MuiTabs-indicator': { backgroundColor: 'var(--accent)', height: 2 },
+                            }}
                         >
                             <Tab label="CRM Tasks" value="crm" />
-                            <Tab label="Security Monitor" value="security" icon={<SecurityIcon fontSize="small" />} iconPosition="start" />
+                            <Tab label="Security Monitor" value="security" icon={<SecurityIcon sx={{ fontSize: 14 }} />} iconPosition="start" />
                         </Tabs>
                     ) : (
                         <Box sx={{ flexGrow: 1 }} />
