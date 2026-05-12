@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import {
     verifyJWT, listUsersAsync, createUser, deleteUserAsync, setUserBlocked, setUserLicense,
-    getLoginHistory, getKickHistory, sessionStore, destroySession, type UserRole,
+    renameUser, getLoginHistory, getKickHistory, sessionStore, destroySession, type UserRole,
 } from '@/lib/auth';
 
 // Helper to verify admin role from JWT
@@ -148,6 +148,15 @@ export async function PATCH(request: NextRequest) {
 
         if (!username) {
             return NextResponse.json({ error: 'username is required' }, { status: 400 });
+        }
+
+        if (action === 'rename') {
+            const { newUsername } = body;
+            if (!newUsername || typeof newUsername !== 'string' || newUsername.trim().length < 3) {
+                return NextResponse.json({ error: 'New username must be at least 3 characters' }, { status: 400 });
+            }
+            await renameUser(username, newUsername.trim(), admin.userId);
+            return NextResponse.json({ success: true, message: `User renamed to "${newUsername.trim()}"` });
         }
 
         if (action === 'setLicense') {

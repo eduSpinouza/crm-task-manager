@@ -389,6 +389,31 @@ export async function createUser(
     return user;
 }
 
+export async function renameUser(oldUsername: string, newUsername: string, requestedBy: string): Promise<void> {
+    const redis = getUserRedis();
+    if (!redis) {
+        throw new Error('Redis is required for user management.');
+    }
+
+    if (oldUsername === requestedBy) {
+        throw new Error('Cannot rename your own account');
+    }
+
+    const existing = await redis.get<UserConfig>(userKey(oldUsername));
+    if (!existing) {
+        throw new Error(`User "${oldUsername}" not found`);
+    }
+
+    const newExists = await redis.get(userKey(newUsername));
+    if (newExists) {
+        throw new Error(`Username "${newUsername}" is already taken`);
+    }
+
+    await redis.set(userKey(newUsername), { ...existing, username: newUsername });
+    await redis.del(userKey(oldUsername));
+    await destroySession(oldUsername);
+}
+
 export async function deleteUserAsync(username: string, requestedBy: string): Promise<void> {
     const redis = getUserRedis();
     if (!redis) {
