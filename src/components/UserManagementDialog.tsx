@@ -209,7 +209,7 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                 </Typography>
             </Box>
 
-            <DialogContent sx={{ pt: 0 }}>
+            <DialogContent sx={{ pt: 0, overflow: 'visible' }}>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
                         {error}
@@ -228,15 +228,15 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                 ) : (
                     <>
                         {/* Users table */}
-                        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                            <Table size="small">
+                        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, maxHeight: 440, overflow: 'auto' }}>
+                            <Table size="small" stickyHeader>
                                 <TableHead>
-                                    <TableRow>
-                                        <TableCell>Username</TableCell>
-                                        <TableCell>Role</TableCell>
-                                        <TableCell>Created</TableCell>
-                                        <TableCell>License</TableCell>
-                                        <TableCell align="right">Actions</TableCell>
+                                    <TableRow sx={{ bgcolor: 'var(--paper-2)' }}>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>Username</TableCell>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>Role</TableCell>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>Created</TableCell>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>License</TableCell>
+                                        <TableCell align="right" sx={{ bgcolor: 'var(--paper-2)' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>

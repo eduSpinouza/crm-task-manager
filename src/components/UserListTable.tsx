@@ -829,7 +829,7 @@ export default function UserListTable() {
                         display: 'flex',
                         alignItems: 'center',
                         gap: '12px',
-                        zIndex: 1400,
+                        zIndex: 1250,
                         animation: 'selectionBarIn var(--dur-base, 180ms) var(--ease, cubic-bezier(0.2,0,0,1)) both',
                         '@keyframes selectionBarIn': {
                             from: { opacity: 0, transform: 'translateX(-50%) translateY(12px)' },
