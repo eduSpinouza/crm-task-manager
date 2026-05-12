@@ -542,7 +542,7 @@ export default function UserListTable() {
         <Paper sx={{ width: '100%', p: 2 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
                 <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                    <Typography sx={{ fontFamily: 'var(--font-serif)', fontSize: 28, lineHeight: 1, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
+                    <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 28, lineHeight: 1, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
                         Debtors
                     </Typography>
                     {rows.length > 0 && (
