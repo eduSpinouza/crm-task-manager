@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { Box, AppBar, Toolbar, Typography, Button, Alert, Snackbar, Tabs, Tab, Chip, Tooltip } from '@mui/material';
+import { Box, AppBar, Toolbar, Typography, Button, Snackbar, Tabs, Tab, Tooltip } from '@mui/material';
 import PeopleIcon from '@mui/icons-material/People';
 import SecurityIcon from '@mui/icons-material/Security';
 import CardMembershipIcon from '@mui/icons-material/CardMembership';
@@ -80,7 +80,7 @@ export default function DashboardPage() {
 
     return (
         <Box sx={{ flexGrow: 1 }}>
-            <AppBar position="static">
+            <AppBar position="static" sx={{ bgcolor: 'var(--ink)', borderBottom: '1px solid rgba(255,255,255,0.08)' }}>
                 <Toolbar sx={{ gap: 1, minHeight: '52px !important', px: '20px !important' }}>
                     {/* Brand */}
                     <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
@@ -90,11 +90,11 @@ export default function DashboardPage() {
                                 fontSize: 20,
                                 lineHeight: 1,
                                 letterSpacing: '-0.01em',
-                                color: 'var(--ink)',
+                                color: '#fff',
                             }}
                         >
                             Cobra
-                            <Box component="em" sx={{ color: 'var(--accent)', fontStyle: 'italic' }}>Ya!</Box>
+                            <Box component="em" sx={{ color: 'oklch(72% 0.13 258)', fontStyle: 'italic' }}>Ya!</Box>
                         </Typography>
                         {currentUsername && (
                             <Typography
@@ -102,7 +102,7 @@ export default function DashboardPage() {
                                     font: '500 10px var(--font-mono)',
                                     letterSpacing: '0.06em',
                                     textTransform: 'uppercase',
-                                    color: 'var(--ink-3)',
+                                    color: 'rgba(255,255,255,0.35)',
                                     mt: '2px',
                                 }}
                             >
@@ -116,18 +116,18 @@ export default function DashboardPage() {
                         <Button
                             startIcon={<PeopleIcon />}
                             onClick={() => setUsersDialogOpen(true)}
-                            sx={{ color: 'var(--ink-2)', fontSize: 12 }}
+                            sx={{ color: 'rgba(255,255,255,0.6)', fontSize: 12, '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }}
                         >
                             Users
                         </Button>
                     )}
-                    <TokenSettings />
+                    <TokenSettings dark />
                     <Button
                         onClick={handleLogout}
                         sx={{
-                            color: 'var(--ink-3)',
+                            color: 'rgba(255,255,255,0.6)',
                             fontSize: 12,
-                            '&:hover': { color: 'var(--danger)' },
+                            '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' },
                         }}
                     >
                         Sign out
@@ -167,28 +167,29 @@ export default function DashboardPage() {
                         const expiryLabel = licenseDaysLeft !== null && licenseDaysLeft > 0
                             ? `Expires ${new Date(Date.now() + licenseDaysLeft * 86400000).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`
                             : 'License has expired';
-                        const colors = licenseStatus === 'ok'
-                            ? { bg: 'rgba(46,125,50,0.08)', border: '#2e7d32', text: '#1b5e20' }
-                            : licenseStatus === 'warning'
-                            ? { bg: 'rgba(237,108,2,0.08)', border: '#ed6c02', text: '#e65100' }
-                            : { bg: 'rgba(211,47,47,0.08)', border: '#d32f2f', text: '#c62828' };
+                        const c = licenseStatus === 'ok' || licenseStatus === 'warning'
+                            ? { bg: 'var(--warn-soft)',   border: 'var(--warn)',   text: 'var(--warn-ink)' }
+                            : { bg: 'var(--danger-soft)', border: 'var(--danger)', text: 'var(--danger)' };
+                        if (licenseStatus === 'ok') {
+                            Object.assign(c, { bg: 'var(--good-soft)', border: 'var(--good)', text: 'var(--good-ink)' });
+                        }
                         return (
                             <Tooltip title={expiryLabel} arrow>
                                 <Box sx={{
-                                    display: 'flex', alignItems: 'center', gap: 1,
-                                    mr: 2, px: 1.5, py: 0.75,
-                                    borderRadius: '10px',
-                                    bgcolor: colors.bg,
-                                    border: `1.5px solid ${colors.border}`,
+                                    display: 'flex', alignItems: 'center', gap: '6px',
+                                    mr: 2, px: '10px', py: '5px',
+                                    bgcolor: c.bg,
+                                    border: '1px solid', borderColor: c.border,
+                                    borderRadius: 'var(--r-sm)',
                                     cursor: 'default',
                                 }}>
-                                    <CardMembershipIcon sx={{ fontSize: 22, color: colors.border }} />
+                                    <CardMembershipIcon sx={{ fontSize: 14, color: c.border }} />
                                     <Box>
-                                        <Typography sx={{ display: 'block', fontSize: '0.6rem', fontWeight: 800, textTransform: 'uppercase', letterSpacing: '0.1em', color: colors.text, lineHeight: 1.2 }}>
+                                        <Typography sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: c.text, lineHeight: 1 }}>
                                             License
                                         </Typography>
-                                        <Typography sx={{ fontSize: '0.82rem', fontWeight: 700, color: colors.text, lineHeight: 1.3 }}>
-                                            {licenseStatus === 'expired' ? 'Expired' : `${licenseDaysLeft} days remaining`}
+                                        <Typography sx={{ font: '500 12px var(--font-sans)', color: c.text, lineHeight: 1.3, mt: '2px' }}>
+                                            {licenseStatus === 'expired' ? 'Expired' : `${licenseDaysLeft}d remaining`}
                                         </Typography>
                                     </Box>
                                 </Box>
@@ -198,7 +199,7 @@ export default function DashboardPage() {
                 </Box>
             )}
 
-            <Box sx={{ mt: 4, px: 4, width: '100%' }}>
+            <Box sx={{ mt: 2, px: 2 }}>
                 {currentTab === 'crm' || userRole !== 'admin' ? (
                     <UserListTable />
                 ) : (
@@ -215,10 +216,22 @@ export default function DashboardPage() {
                 open={!!sessionAlert}
                 autoHideDuration={6000}
                 onClose={() => setSessionAlert('')}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
             >
-                <Alert severity="warning" onClose={() => setSessionAlert('')}>
+                <Box sx={{
+                    display: 'flex', alignItems: 'center', gap: 1.5,
+                    bgcolor: 'var(--warn-soft)', border: '1px solid var(--warn)',
+                    borderRadius: 'var(--r-md)', px: '16px', py: '10px',
+                    boxShadow: 'var(--shadow-modal)',
+                    font: '500 13px var(--font-sans)', color: 'var(--warn-ink)',
+                }}>
                     {sessionAlert}
-                </Alert>
+                    <Box component="button" onClick={() => setSessionAlert('')} sx={{
+                        ml: 1, border: 0, background: 'none', cursor: 'pointer',
+                        font: '500 11px var(--font-mono)', color: 'var(--warn-ink)',
+                        opacity: 0.6, '&:hover': { opacity: 1 },
+                    }}>✕</Box>
+                </Box>
             </Snackbar>
         </Box>
     );

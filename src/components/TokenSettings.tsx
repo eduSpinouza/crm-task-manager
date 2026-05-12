@@ -36,7 +36,7 @@ const overlineSx = {
     color: 'var(--ink-3)',
 };
 
-export default function TokenSettings() {
+export default function TokenSettings({ dark = false }: { dark?: boolean }) {
     const [open, setOpen] = React.useState(false);
     const [tabIndex, setTabIndex] = React.useState(0);
     const [token, setToken] = React.useState('');
@@ -173,7 +173,10 @@ export default function TokenSettings() {
                 <IconButton
                     onClick={handleClickOpen}
                     size="small"
-                    sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' } }}
+                    sx={dark
+                        ? { color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }
+                        : { color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' } }
+                    }
                 >
                     <SettingsIcon fontSize="small" />
                 </IconButton>

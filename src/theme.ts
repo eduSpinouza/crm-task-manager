@@ -212,6 +212,43 @@ export const theme = createTheme({
       },
     },
 
+    MuiTablePagination: {
+      styleOverrides: {
+        toolbar: { minHeight: 36, paddingLeft: 8 },
+        selectLabel: {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 10,
+          fontWeight: 500,
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase' as const,
+          color: hex.ink3,
+          margin: 0,
+        },
+        select: {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 12,
+          color: hex.ink,
+          paddingTop: 0,
+          paddingBottom: 0,
+        },
+        selectIcon: { color: hex.ink3 },
+        displayedRows: {
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: 11,
+          color: hex.ink3,
+          margin: 0,
+        },
+        actions: {
+          '& .MuiIconButton-root': {
+            padding: 6,
+            color: hex.ink3,
+            '&:hover': { color: hex.ink, backgroundColor: hex.paper2 },
+            '&.Mui-disabled': { color: hex.line },
+          },
+        },
+      },
+    },
+
     MuiCheckbox: {
       styleOverrides: {
         root: { padding: 6, color: hex.ink3 },

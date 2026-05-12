@@ -4,7 +4,7 @@ import * as React from 'react';
 import {
     Box, Button, Paper, Typography, Alert, CircularProgress,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Checkbox, TablePagination, FormControl, InputLabel, Select, MenuItem,
+    Checkbox, TablePagination, Select, MenuItem, IconButton,
     Menu,
 } from '@mui/material';
 import axios from 'axios';
@@ -14,6 +14,8 @@ import DebtorDetailDialog from './DebtorDetailDialog';
 import Snackbar from '@mui/material/Snackbar';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { groupByUserId } from '@/lib/duplicateUtils';
@@ -539,88 +541,150 @@ export default function UserListTable() {
     };
 
     return (
-        <Paper sx={{ width: '100%', p: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '12px' }}>
-                    <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 28, lineHeight: 1, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
-                        Debtors
-                    </Typography>
-                    {rows.length > 0 && (
-                        <Typography sx={{ font: '500 11px var(--font-mono)', color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
-                            {filteredRows.length !== rows.length
-                                ? `${filteredRows.length} / ${rows.length}`
-                                : rows.length} total
+        <Paper sx={{ width: '100%', p: 0 }}>
+            {/* ── Section header ── */}
+            <Box sx={{ bgcolor: 'var(--paper-2)', px: 3, pt: 2.5, pb: 2, borderBottom: '1px solid var(--line)' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '12px', borderLeft: '3px solid var(--accent)', pl: 1.5 }}>
+                        <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 28, lineHeight: 1, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
+                            Debtors
                         </Typography>
-                    )}
+                        {rows.length > 0 && (
+                            <Typography sx={{ font: '500 11px var(--font-mono)', color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
+                                {filteredRows.length !== rows.length
+                                    ? `${filteredRows.length} / ${rows.length}`
+                                    : rows.length} total
+                            </Typography>
+                        )}
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <Button
+                            variant="outlined"
+                            startIcon={exporting ? <CircularProgress size={16} /> : <FileDownloadIcon />}
+                            disabled={loading || loadingEmails || exporting || rows.length === 0}
+                            onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                        >
+                            {exporting ? 'Exporting…' : 'Export'}
+                        </Button>
+                        <Menu
+                            anchorEl={exportMenuAnchor}
+                            open={Boolean(exportMenuAnchor)}
+                            onClose={() => setExportMenuAnchor(null)}
+                        >
+                            <MenuItem onClick={handleExportClick('excel')}>
+                                Download Excel (.xlsx)
+                            </MenuItem>
+                            <MenuItem onClick={handleExportClick('sheets')}>
+                                Export to Google Sheets
+                            </MenuItem>
+                        </Menu>
+                        <Button
+                            variant="outlined"
+                            disabled={selected.length === 0}
+                            onClick={() => setIsEmailDialogOpen(true)}
+                        >
+                            Send Email (<span className="notranslate">{selected.length}</span>)
+                        </Button>
+                        <Button
+                            variant="contained"
+                            disabled={selected.length === 0}
+                            onClick={() => setIsDialogOpen(true)}
+                        >
+                            Add Follow Up (<span className="notranslate">{selected.length}</span>)
+                        </Button>
+                    </Box>
                 </Box>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                        variant="outlined"
-                        startIcon={exporting ? <CircularProgress size={16} /> : <FileDownloadIcon />}
-                        disabled={loading || loadingEmails || exporting || rows.length === 0}
-                        onClick={(e) => setExportMenuAnchor(e.currentTarget)}
-                    >
-                        {exporting ? 'Exporting…' : 'Export'}
-                    </Button>
-                    <Menu
-                        anchorEl={exportMenuAnchor}
-                        open={Boolean(exportMenuAnchor)}
-                        onClose={() => setExportMenuAnchor(null)}
-                    >
-                        <MenuItem onClick={handleExportClick('excel')}>
-                            Download Excel (.xlsx)
-                        </MenuItem>
-                        <MenuItem onClick={handleExportClick('sheets')}>
-                            Export to Google Sheets
-                        </MenuItem>
-                    </Menu>
-                    <Button
-                        variant="outlined"
-                        disabled={selected.length === 0}
-                        onClick={() => setIsEmailDialogOpen(true)}
-                    >
-                        Send Email (<span className="notranslate">{selected.length}</span>)
-                    </Button>
-                    <Button
-                        variant="contained"
-                        disabled={selected.length === 0}
-                        onClick={() => setIsDialogOpen(true)}
-                    >
-                        Add Follow Up (<span className="notranslate">{selected.length}</span>)
-                    </Button>
-                </Box>
-            </Box>
 
-            {/* Filters */}
-            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>App Name</InputLabel>
+                {/* Filters + page nav */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <Box>
+                    <Typography sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', mb: 0.5 }}>
+                        App Name
+                    </Typography>
                     <Select
+                        size="small"
                         value={filterAppName}
-                        label="App Name"
                         onChange={(e) => setFilterAppName(e.target.value)}
+                        displayEmpty
+                        sx={{ minWidth: 150 }}
                     >
                         <MenuItem value="">All</MenuItem>
                         {[...new Set(rows.map(r => r.appName).filter(Boolean))].map(app => (
                             <MenuItem key={app} value={app}>{app}</MenuItem>
                         ))}
                     </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Overdue Days</InputLabel>
+                </Box>
+                <Box>
+                    <Typography sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', mb: 0.5 }}>
+                        Overdue Days
+                    </Typography>
                     <Select
+                        size="small"
                         value={filterOverdueDay}
-                        label="Overdue Days"
                         onChange={(e) => setFilterOverdueDay(e.target.value)}
+                        displayEmpty
+                        sx={{ minWidth: 150 }}
                     >
                         <MenuItem value="">All</MenuItem>
                         {[...new Set(rows.map(r => r.overdueDay).filter(d => d !== undefined))].sort((a, b) => a - b).map(day => (
                             <MenuItem key={day} value={String(day)}>{day} days</MenuItem>
                         ))}
                     </Select>
-                </FormControl>
-            </Box>
+                </Box>
+                </Box> {/* end filters */}
 
+                {/* Compact page nav + rows per page */}
+                {filteredRows.length > 0 && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        {/* Rows per page */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+                                Rows
+                            </Typography>
+                            <Select
+                                size="small"
+                                value={pageSize}
+                                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+                                sx={{ font: '500 11px var(--font-mono)', minWidth: 64, '& .MuiSelect-select': { py: '4px' } }}
+                            >
+                                {[50, 100, 250, 500].map(n => (
+                                    <MenuItem key={n} value={n} sx={{ font: '500 11px var(--font-mono)' }}>{n}</MenuItem>
+                                ))}
+                            </Select>
+                        </Box>
+
+                        <Box sx={{ width: '1px', height: 20, bgcolor: 'var(--line)' }} />
+
+                        {/* Prev / next */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <IconButton
+                                size="small"
+                                onClick={() => setPage(p => Math.max(0, p - 1))}
+                                disabled={page === 0}
+                                sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' }, '&.Mui-disabled': { color: 'var(--line)' } }}
+                            >
+                                <ChevronLeftIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                            <Typography sx={{ font: '500 11px var(--font-mono)', color: 'var(--ink-3)', whiteSpace: 'nowrap', minWidth: 80, textAlign: 'center' }}>
+                                {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filteredRows.length)} of {filteredRows.length}
+                            </Typography>
+                            <IconButton
+                                size="small"
+                                onClick={() => setPage(p => p + 1)}
+                                disabled={(page + 1) * pageSize >= filteredRows.length}
+                                sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' }, '&.Mui-disabled': { color: 'var(--line)' } }}
+                            >
+                                <ChevronRightIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Box>
+                    </Box>
+                )}
+                </Box> {/* end filters+nav row */}
+            </Box> {/* end section header */}
+
+            {/* ── Content area ── */}
+            <Box sx={{ px: 2, pt: 1.5 }}>
             {!hasToken && (
                 <Alert severity="warning" sx={{ mb: 2 }}>
                     Please configure the <strong>External API Token</strong> in the dashboard settings (top right) to view data.
@@ -653,15 +717,6 @@ export default function UserListTable() {
                         </Box>
                     ) : (
                         <>
-                        <TablePagination
-                            component="div"
-                            count={filteredRows.length}
-                            page={page}
-                            onPageChange={handleChangePage}
-                            rowsPerPage={pageSize}
-                            onRowsPerPageChange={handleChangeRowsPerPage}
-                            rowsPerPageOptions={[50, 100, 250, 500]}
-                        />
                         <Box
                             ref={topScrollRef}
                             onScroll={handleTopScroll}
@@ -751,7 +806,6 @@ export default function UserListTable() {
                                 </TableBody>
                             </Table>
                         </TableContainer>
-                        </Box>
                         <TablePagination
                             component="div"
                             count={filteredRows.length}
@@ -760,11 +814,14 @@ export default function UserListTable() {
                             rowsPerPage={pageSize}
                             onRowsPerPageChange={handleChangeRowsPerPage}
                             rowsPerPageOptions={[50, 100, 250, 500]}
+                            sx={{ bgcolor: 'var(--paper-2)', borderTop: '1px solid var(--line)' }}
                         />
+                        </Box>
                         </>
                     )}
                 </>
             )}
+            </Box> {/* end content area */}
 
             <FollowUpDialog
                 open={isDialogOpen}
