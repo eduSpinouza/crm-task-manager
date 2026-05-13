@@ -6,7 +6,6 @@ import TextField from '@mui/material/TextField';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
-import DialogContentText from '@mui/material/DialogContentText';
 import DialogTitle from '@mui/material/DialogTitle';
 import SettingsIcon from '@mui/icons-material/Settings';
 import Box from '@mui/material/Box';
@@ -30,7 +29,14 @@ interface EmailAccount {
     createdAt: number;
 }
 
-export default function TokenSettings() {
+const overlineSx = {
+    font: '500 10px var(--font-mono)',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase' as const,
+    color: 'var(--ink-3)',
+};
+
+export default function TokenSettings({ dark = false }: { dark?: boolean }) {
     const [open, setOpen] = React.useState(false);
     const [tabIndex, setTabIndex] = React.useState(0);
     const [token, setToken] = React.useState('');
@@ -38,13 +44,11 @@ export default function TokenSettings() {
     const savedToken = React.useRef('');
     const savedApiBaseUrl = React.useRef('');
 
-    // Email accounts state
     const [accounts, setAccounts] = React.useState<EmailAccount[]>([]);
     const [accountsLoading, setAccountsLoading] = React.useState(false);
     const [accountsError, setAccountsError] = React.useState('');
     const [connectingGmail, setConnectingGmail] = React.useState(false);
 
-    // Google Sheets account state
     const [sheetsEmail, setSheetsEmail] = React.useState<string | null>(null);
     const [sheetsDisconnecting, setSheetsDisconnecting] = React.useState(false);
 
@@ -129,7 +133,6 @@ export default function TokenSettings() {
         };
         window.addEventListener('message', onMessage);
 
-        // Fallback: if popup closes without sending message
         const timer = setInterval(() => {
             if (popup?.closed) {
                 clearInterval(timer);
@@ -154,7 +157,6 @@ export default function TokenSettings() {
             await axios.delete(`/api/email/accounts?id=${id}`);
             setAccounts(prev => {
                 const filtered = prev.filter(a => a.id !== id);
-                // If deleted account was default, mark first as default in local state
                 if (prev.find(a => a.id === id)?.isDefault && filtered.length > 0) {
                     filtered[0] = { ...filtered[0], isDefault: true };
                 }
@@ -167,85 +169,105 @@ export default function TokenSettings() {
 
     return (
         <React.Fragment>
-            <Button
-                variant="outlined"
-                startIcon={<SettingsIcon />}
-                onClick={handleClickOpen}
-                color="inherit"
-                sx={{ ml: 2 }}
-            >
-                Settings
-            </Button>
+            <Tooltip title="Settings">
+                <IconButton
+                    onClick={handleClickOpen}
+                    size="small"
+                    sx={dark
+                        ? { color: 'rgba(255,255,255,0.6)', '&:hover': { color: '#fff', bgcolor: 'rgba(255,255,255,0.08)' } }
+                        : { color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' } }
+                    }
+                >
+                    <SettingsIcon fontSize="small" />
+                </IconButton>
+            </Tooltip>
+
             <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-                <DialogTitle>Configuration</DialogTitle>
-                <DialogContent>
-                    <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 2 }}>
+                <DialogTitle sx={{ pb: 0 }}>
+                    <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--ink)', lineHeight: 1 }}>
+                        Configuration
+                    </Typography>
+                </DialogTitle>
+
+                <Box sx={{ px: 3 }}>
+                    <Tabs
+                        value={tabIndex}
+                        onChange={(_, v) => setTabIndex(v)}
+                        sx={{
+                            borderBottom: '1px solid var(--line)',
+                            '& .MuiTab-root': { fontSize: 12, fontWeight: 500, minHeight: 40, textTransform: 'none', color: 'var(--ink-3)' },
+                            '& .Mui-selected': { color: 'var(--ink) !important' },
+                            '& .MuiTabs-indicator': { backgroundColor: 'var(--accent)' },
+                        }}
+                    >
                         <Tab label="API" />
                         <Tab label="Email" />
                     </Tabs>
+                </Box>
 
+                <DialogContent>
                     {tabIndex === 0 && (
                         <Box>
-                            <DialogContentText sx={{ mb: 2 }}>
-                                Configure the external CRM connection. Both fields are required to fetch data.
-                            </DialogContentText>
+                            <Typography sx={{ ...overlineSx, mb: 1.5 }}>CRM Connection</Typography>
                             <TextField
                                 margin="dense"
                                 label="API Base URL"
                                 type="url"
                                 fullWidth
-                                variant="outlined"
                                 value={apiBaseUrl}
                                 onChange={(e) => setApiBaseUrl(e.target.value)}
                                 placeholder="https://crm.example.com"
-                                helperText="The base domain of the CRM API (without trailing slash)"
+                                helperText="Base domain without trailing slash"
                             />
                             <TextField
                                 margin="dense"
                                 label="Bearer Token"
                                 type="text"
                                 fullWidth
-                                variant="outlined"
                                 value={token}
                                 onChange={(e) => setToken(e.target.value)}
                                 multiline
                                 rows={4}
+                                sx={{ mt: 1 }}
                             />
                         </Box>
                     )}
 
                     {tabIndex === 1 && (
                         <Box>
-                            <DialogContentText sx={{ mb: 2 }}>
-                                Connect Gmail accounts to send emails. Each account uses secure Google OAuth — no app passwords needed.
-                            </DialogContentText>
+                            {/* Gmail accounts */}
+                            <Typography sx={{ ...overlineSx, mb: 1.5 }}>Gmail Accounts</Typography>
+                            <Typography sx={{ fontSize: 13, color: 'var(--ink-3)', mb: 2 }}>
+                                Connect Gmail via OAuth — no app passwords needed.
+                            </Typography>
 
                             {accountsError && (
-                                <Typography color="error" variant="body2" sx={{ mb: 1 }}>
+                                <Typography sx={{ fontSize: 12, color: 'var(--danger)', mb: 1 }}>
                                     {accountsError}
                                 </Typography>
                             )}
 
                             {accountsLoading ? (
                                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                                    <CircularProgress size={24} />
+                                    <CircularProgress size={20} />
                                 </Box>
                             ) : accounts.length === 0 ? (
-                                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                                <Typography sx={{ fontSize: 13, color: 'var(--ink-3)', mb: 2 }}>
                                     No Gmail accounts connected yet.
                                 </Typography>
                             ) : (
-                                <Box sx={{ mb: 2 }}>
-                                    {accounts.map(account => (
+                                <Box sx={{ mb: 2, border: '1px solid var(--line)', borderRadius: '4px', overflow: 'hidden' }}>
+                                    {accounts.map((account, i) => (
                                         <Box
                                             key={account.id}
                                             sx={{
                                                 display: 'flex',
                                                 alignItems: 'center',
                                                 gap: 1,
-                                                py: 0.75,
-                                                borderBottom: '1px solid',
-                                                borderColor: 'divider',
+                                                px: 1.5,
+                                                py: 1,
+                                                borderBottom: i < accounts.length - 1 ? '1px solid var(--line-2)' : 'none',
+                                                '&:hover': { bgcolor: 'var(--paper-2)' },
                                             }}
                                         >
                                             <Tooltip title="Set as default sender">
@@ -253,17 +275,26 @@ export default function TokenSettings() {
                                                     checked={account.isDefault}
                                                     onChange={() => handleSetDefault(account.id)}
                                                     size="small"
+                                                    sx={{ p: 0.5, color: 'var(--ink-3)' }}
                                                 />
                                             </Tooltip>
-                                            <Box sx={{ flex: 1 }}>
-                                                <Typography variant="body2">{account.email}</Typography>
+                                            <Box sx={{ flex: 1, minWidth: 0 }}>
+                                                <Typography sx={{ fontSize: 13, color: 'var(--ink)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                    {account.email}
+                                                </Typography>
                                                 {account.isDefault && (
-                                                    <Chip label="Default" size="small" color="primary" sx={{ mt: 0.25 }} />
+                                                    <Box sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.04em', color: 'var(--accent)', textTransform: 'uppercase', mt: '2px' }}>
+                                                        Default
+                                                    </Box>
                                                 )}
                                             </Box>
-                                            <Tooltip title="Remove account">
-                                                <IconButton size="small" onClick={() => handleDelete(account.id)}>
-                                                    <DeleteIcon fontSize="small" />
+                                            <Tooltip title="Remove">
+                                                <IconButton
+                                                    size="small"
+                                                    onClick={() => handleDelete(account.id)}
+                                                    sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--danger)' } }}
+                                                >
+                                                    <DeleteIcon sx={{ fontSize: 16 }} />
                                                 </IconButton>
                                             </Tooltip>
                                         </Box>
@@ -273,20 +304,20 @@ export default function TokenSettings() {
 
                             <Button
                                 variant="outlined"
-                                startIcon={connectingGmail ? <CircularProgress size={16} /> : <AddIcon />}
+                                startIcon={connectingGmail ? <CircularProgress size={14} /> : <AddIcon />}
                                 onClick={handleConnectGmail}
                                 disabled={connectingGmail}
+                                size="small"
                             >
                                 {connectingGmail ? 'Connecting…' : 'Connect Gmail'}
                             </Button>
 
-                            <Box sx={{ mt: 3 }}>
-                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                    Google Sheets Export
-                                </Typography>
+                            {/* Google Sheets */}
+                            <Box sx={{ mt: 3.5, pt: 2.5, borderTop: '1px solid var(--line)' }}>
+                                <Typography sx={{ ...overlineSx, mb: 1.5 }}>Google Sheets Export</Typography>
                                 {sheetsEmail ? (
                                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                        <Typography variant="body2" sx={{ flex: 1 }}>
+                                        <Typography sx={{ fontSize: 13, color: 'var(--ink)', flex: 1 }}>
                                             {sheetsEmail}
                                         </Typography>
                                         <Chip label="Connected" size="small" color="success" />
@@ -295,15 +326,16 @@ export default function TokenSettings() {
                                                 size="small"
                                                 onClick={handleDisconnectSheets}
                                                 disabled={sheetsDisconnecting}
+                                                sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--danger)' } }}
                                             >
                                                 {sheetsDisconnecting
-                                                    ? <CircularProgress size={16} />
-                                                    : <DeleteIcon fontSize="small" />}
+                                                    ? <CircularProgress size={14} />
+                                                    : <DeleteIcon sx={{ fontSize: 16 }} />}
                                             </IconButton>
                                         </Tooltip>
                                     </Box>
                                 ) : (
-                                    <Typography variant="body2" color="text.secondary">
+                                    <Typography sx={{ fontSize: 13, color: 'var(--ink-3)' }}>
                                         No Google account connected. Use the export button on the user list to connect one.
                                     </Typography>
                                 )}
@@ -311,11 +343,10 @@ export default function TokenSettings() {
                         </Box>
                     )}
                 </DialogContent>
-                <DialogActions>
-                    <Button onClick={handleClose}>Cancel</Button>
-                    <Button onClick={handleSave} variant="contained" color="primary">
-                        Save
-                    </Button>
+
+                <DialogActions sx={{ px: 3, pb: 2.5 }}>
+                    <Button onClick={handleClose} sx={{ color: 'var(--ink-3)' }}>Cancel</Button>
+                    <Button onClick={handleSave} variant="contained">Save</Button>
                 </DialogActions>
             </Dialog>
         </React.Fragment>

@@ -3,31 +3,20 @@
 import React, { useState, useEffect } from 'react';
 import {
     Dialog,
-    DialogTitle,
     DialogContent,
     DialogActions,
     Button,
-    TextField,
     Box,
     Typography,
-    Alert,
-    LinearProgress,
     Tabs,
     Tab,
     IconButton,
-    List,
-    ListItemButton,
-    ListItemText,
-    ListItemSecondaryAction,
-    FormControl,
-    InputLabel,
-    Select,
-    MenuItem,
-    Chip,
+    LinearProgress,
+    Tooltip,
 } from '@mui/material';
 import DeleteIcon from '@mui/icons-material/Delete';
 import axios from 'axios';
-import { mergeTemplates, hideDefault, DEFAULT_TEMPLATES, type EmailTemplate as DefaultEmailTemplate } from '@/lib/defaultTemplates';
+import { mergeTemplates, hideDefault, type EmailTemplate as DefaultEmailTemplate } from '@/lib/defaultTemplates';
 
 interface UserData {
     email?: string;
@@ -66,54 +55,72 @@ interface EmailDialogProps {
 
 const LAST_ACCOUNT_KEY = 'email_last_used_account_id';
 
+const overlineSx = {
+    font: '500 10px var(--font-mono)',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase' as const,
+    color: 'var(--ink-3)',
+    mb: 1,
+};
+
+const fieldSx = {
+    width: '100%',
+    border: '1px solid var(--line)',
+    borderRadius: 'var(--r-md)',
+    background: 'var(--paper-2)',
+    p: '10px 12px',
+    fontSize: 14,
+    color: 'var(--ink)',
+    fontFamily: 'var(--font-sans)',
+    outline: 0,
+    display: 'block',
+    transition: 'border-color 120ms',
+    '&::placeholder': { color: 'var(--ink-3)' },
+    '&:hover': { borderColor: 'var(--ink-3)' },
+    '&:focus': { borderColor: 'var(--accent)', borderWidth: '2px', background: 'var(--paper)' },
+};
+
+const PLACEHOLDER_GROUPS = [
+    { group: 'Contact',  tokens: ['{{userName}}', '{{email}}', '{{phone}}', '{{appName}}', '{{productName}}'] },
+    { group: 'Schedule', tokens: ['{{repayTime}}', '{{stageName}}'] },
+    { group: 'Amounts',  tokens: ['{{contractAmount}}', '{{totalAmount}}', '{{overdueFee}}', '{{extensionAmount}}'] },
+    { group: 'Images',   tokens: ['{{idNoUrl}}', '{{livingNessUrl}}'] },
+];
+
 export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }: EmailDialogProps) {
     const [subject, setSubject] = useState('');
     const [body, setBody] = useState('');
     const [sending, setSending] = useState(false);
-    const [progress, setProgress] = useState(0);
     const [error, setError] = useState<string | null>(null);
     const [tabIndex, setTabIndex] = useState(0);
     const [templates, setTemplates] = useState<EmailTemplate[]>([]);
     const [templateName, setTemplateName] = useState('');
-
-    // Sender accounts
     const [accounts, setAccounts] = useState<EmailAccount[]>([]);
     const [selectedAccountId, setSelectedAccountId] = useState('');
 
-    // Load templates from localStorage, merged with defaults
     useEffect(() => {
         let userTemplates: EmailTemplate[] = [];
-        try {
-            userTemplates = JSON.parse(localStorage.getItem('email_templates') || '[]');
-        } catch { }
+        try { userTemplates = JSON.parse(localStorage.getItem('email_templates') || '[]'); } catch { }
         setTemplates(mergeTemplates(userTemplates));
     }, []);
 
-    // Load accounts + Sheets status when dialog opens
     useEffect(() => {
         if (!open) return;
         axios.get('/api/email/accounts').then(res => {
             const accts: EmailAccount[] = res.data.accounts ?? [];
             setAccounts(accts);
-
-            // Prefer last-used account, then the one marked default, then the first
             const lastUsed = localStorage.getItem(LAST_ACCOUNT_KEY);
             const preferred =
                 accts.find(a => a.id === lastUsed) ??
                 accts.find(a => a.isDefault) ??
                 accts[0];
             setSelectedAccountId(preferred?.id ?? '');
-        }).catch(() => {
-            setAccounts([]);
-        });
-
+        }).catch(() => setAccounts([]));
     }, [open]);
 
-    // Save templates to localStorage (user templates only; defaults are never persisted)
-    const saveTemplates = (newTemplates: EmailTemplate[]) => {
-        setTemplates(newTemplates);
-        const userOnly = newTemplates.filter(t => !t.isDefault);
-        localStorage.setItem('email_templates', JSON.stringify(userOnly));
+    const saveTemplates = (next: EmailTemplate[]) => {
+        setTemplates(next);
+        localStorage.setItem('email_templates', JSON.stringify(next.filter(t => !t.isDefault)));
     };
 
     const handleSaveTemplate = () => {
@@ -121,8 +128,7 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
             setError('Template name, subject, and body are required');
             return;
         }
-        const existing = templates.filter(t => t.name !== templateName);
-        saveTemplates([...existing, { name: templateName, subject, body }]);
+        saveTemplates([...templates.filter(t => t.name !== templateName), { name: templateName, subject, body }]);
         setTemplateName('');
         setError(null);
     };
@@ -135,41 +141,32 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
 
     const handleDeleteTemplate = (name: string) => {
         const target = templates.find(t => t.name === name);
-        if (target?.isDefault) {
-            hideDefault(name);
-        }
+        if (target?.isDefault) hideDefault(name);
         saveTemplates(templates.filter(t => t.name !== name));
     };
 
     const handleSend = async () => {
         setError(null);
         setSending(true);
-        setProgress(0);
-
         if (!selectedAccountId) {
             setError('Please connect a Gmail account in Settings before sending emails.');
             setSending(false);
             return;
         }
-
         const usersWithEmail = selectedUsers.filter(u => u.email);
         if (usersWithEmail.length === 0) {
             setError('No selected users have email addresses');
             setSending(false);
             return;
         }
-
         try {
             localStorage.setItem(LAST_ACCOUNT_KEY, selectedAccountId);
-
             const response = await axios.post('/api/email/send', {
                 users: usersWithEmail,
                 subject,
                 bodyTemplate: body,
                 accountId: selectedAccountId,
             });
-
-            setProgress(100);
             if (response.data.failed > 0) {
                 setError(`Sent ${response.data.sent}, failed ${response.data.failed}`);
             } else {
@@ -183,172 +180,274 @@ export default function EmailDialog({ open, onClose, selectedUsers, onSuccess }:
         }
     };
 
-    // Preview: replace placeholders with first user's data
     const getPreview = () => {
         if (selectedUsers.length === 0) return body;
-        const user = selectedUsers[0];
-        let preview = body;
-        preview = preview.replace(/\{\{userName\}\}/g, user.userName || '');
-        preview = preview.replace(/\{\{email\}\}/g, user.email || '');
-        preview = preview.replace(/\{\{phone\}\}/g, user.phone || '');
-        preview = preview.replace(/\{\{appName\}\}/g, (user as any).appName || '');
-        preview = preview.replace(/\{\{productName\}\}/g, user.productName || '');
-        preview = preview.replace(/\{\{principal\}\}/g, String(user.principal || ''));
-        preview = preview.replace(/\{\{contractAmount\}\}/g, String((user as any).totalAmount || ''));
-        preview = preview.replace(/\{\{totalAmount\}\}/g, String((user as any).repayAmount || ''));
-        preview = preview.replace(/\{\{overdueFee\}\}/g, String((user as any).overdueFee || ''));
-        preview = preview.replace(/\{\{extensionAmount\}\}/g, String(user.totalExtensionAmount ?? ''));
-        preview = preview.replace(/\{\{repayTime\}\}/g, user.repayTime || '');
-        preview = preview.replace(/\{\{stageName\}\}/g, user.stageName || '');
-        preview = preview.replace(/\{\{idNoUrl\}\}/g, user.idNoUrl ? `<img src="${user.idNoUrl}" width="200" />` : '');
-        preview = preview.replace(/\{\{livingNessUrl\}\}/g, user.livingNessUrl ? `<img src="${user.livingNessUrl}" width="200" />` : '');
-        return preview;
+        const u = selectedUsers[0];
+        return body
+            .replace(/\{\{userName\}\}/g, u.userName || '')
+            .replace(/\{\{email\}\}/g, u.email || '')
+            .replace(/\{\{phone\}\}/g, u.phone || '')
+            .replace(/\{\{appName\}\}/g, u.appName || '')
+            .replace(/\{\{productName\}\}/g, u.productName || '')
+            .replace(/\{\{principal\}\}/g, String(u.principal || ''))
+            .replace(/\{\{contractAmount\}\}/g, String(u.totalAmount || ''))
+            .replace(/\{\{totalAmount\}\}/g, String(u.repayAmount || ''))
+            .replace(/\{\{overdueFee\}\}/g, String(u.overdueFee || ''))
+            .replace(/\{\{extensionAmount\}\}/g, String(u.totalExtensionAmount ?? ''))
+            .replace(/\{\{repayTime\}\}/g, u.repayTime || '')
+            .replace(/\{\{stageName\}\}/g, u.stageName || '')
+            .replace(/\{\{idNoUrl\}\}/g, u.idNoUrl ? `<img src="${u.idNoUrl}" width="200" />` : '')
+            .replace(/\{\{livingNessUrl\}\}/g, u.livingNessUrl ? `<img src="${u.livingNessUrl}" width="200" />` : '');
     };
+
+    const recipientCount = selectedUsers.filter(u => u.email).length;
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle>Send Email to {selectedUsers.length} Users</DialogTitle>
-            <DialogContent>
-                {/* Sender account picker */}
-                <FormControl fullWidth size="small" sx={{ mb: 2, mt: 1 }}>
-                    <InputLabel>Send from</InputLabel>
-                    <Select
-                        value={selectedAccountId}
-                        label="Send from"
-                        onChange={e => setSelectedAccountId(e.target.value)}
-                        displayEmpty
-                    >
-                        {accounts.length === 0 ? (
-                            <MenuItem value="" disabled>
-                                No Gmail accounts — connect one in Settings
-                            </MenuItem>
-                        ) : (
-                            accounts.map(a => (
-                                <MenuItem key={a.id} value={a.id}>
-                                    {a.email}{a.isDefault ? ' (default)' : ''}
-                                </MenuItem>
-                            ))
-                        )}
-                    </Select>
-                </FormControl>
+            {/* Title */}
+            <Box sx={{ px: 3, pt: 3, pb: 0 }}>
+                <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1.5 }}>
+                    <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 22, lineHeight: 1, color: 'var(--ink)' }}>
+                        Send email
+                    </Typography>
+                    <Box sx={{
+                        font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase',
+                        color: 'var(--ink-3)', bgcolor: 'var(--paper-2)', border: '1px solid var(--line)',
+                        borderRadius: '3px', px: '6px', py: '2px',
+                    }}>
+                        {recipientCount} recipient{recipientCount !== 1 ? 's' : ''}
+                    </Box>
+                </Box>
+            </Box>
 
-                <Tabs value={tabIndex} onChange={(_, v) => setTabIndex(v)} sx={{ mb: 2 }}>
+            {/* Account picker */}
+            <Box sx={{ px: 3, pt: 2.5 }}>
+                <Typography sx={overlineSx}>From</Typography>
+                {accounts.length === 0 ? (
+                    <Typography sx={{ fontSize: 13, color: 'var(--ink-3)' }}>
+                        No Gmail accounts connected — add one in Settings.
+                    </Typography>
+                ) : (
+                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.75 }}>
+                        {accounts.map(a => (
+                            <Box
+                                key={a.id}
+                                onClick={() => setSelectedAccountId(a.id)}
+                                sx={{
+                                    px: '10px', py: '5px',
+                                    border: '1px solid',
+                                    borderColor: selectedAccountId === a.id ? 'var(--accent)' : 'var(--line)',
+                                    borderRadius: '3px',
+                                    bgcolor: selectedAccountId === a.id ? 'var(--accent-soft)' : 'transparent',
+                                    color: selectedAccountId === a.id ? 'var(--accent)' : 'var(--ink-2)',
+                                    font: '500 12px var(--font-sans)',
+                                    cursor: 'pointer',
+                                    transition: 'all 100ms',
+                                    userSelect: 'none',
+                                    '&:hover': {
+                                        borderColor: selectedAccountId === a.id ? 'var(--accent)' : 'var(--ink-3)',
+                                        color: selectedAccountId === a.id ? 'var(--accent)' : 'var(--ink)',
+                                    },
+                                }}
+                            >
+                                {a.email}
+                            </Box>
+                        ))}
+                    </Box>
+                )}
+            </Box>
+
+            {/* Tabs */}
+            <Box sx={{ px: 3, mt: 2.5 }}>
+                <Tabs
+                    value={tabIndex}
+                    onChange={(_, v) => setTabIndex(v)}
+                    sx={{
+                        borderBottom: '1px solid var(--line)',
+                        '& .MuiTab-root': { fontSize: 12, fontWeight: 500, minHeight: 40, textTransform: 'none', color: 'var(--ink-3)' },
+                        '& .Mui-selected': { color: 'var(--ink) !important' },
+                        '& .MuiTabs-indicator': { backgroundColor: 'var(--accent)' },
+                    }}
+                >
                     <Tab label="Compose" />
                     <Tab label="Templates" />
                     <Tab label="Preview" />
                 </Tabs>
+            </Box>
 
+            <DialogContent sx={{ pt: 2.5 }}>
+                {/* Compose */}
                 {tabIndex === 0 && (
                     <Box>
-                        <TextField
-                            fullWidth
-                            label="Subject"
-                            value={subject}
-                            onChange={e => setSubject(e.target.value)}
-                            margin="normal"
-                            placeholder="e.g., Payment Reminder for {{productName}}"
-                        />
-                        <TextField
-                            fullWidth
-                            label="Body"
-                            value={body}
-                            onChange={e => setBody(e.target.value)}
-                            margin="normal"
-                            multiline
-                            rows={8}
-                            placeholder="Dear {{userName}}, your payment of {{principal}} is due on {{repayTime}}..."
-                        />
-                        <Typography variant="caption" color="textSecondary" component="div">
-                            <strong>Text:</strong> {"{{userName}}"}, {"{{email}}"}, {"{{phone}}"}, {"{{appName}}"}, {"{{productName}}"}, {"{{repayTime}}"}, {"{{stageName}}"}
-                            <br />
-                            <strong>Amounts:</strong> {"{{contractAmount}}"}, {"{{totalAmount}}"}, {"{{overdueFee}}"}, {"{{extensionAmount}}"}
-                            <br />
-                            <strong>Images:</strong> {"{{idNoUrl}}"} - automatically embeds user ID photo
-                        </Typography>
+                        <Box sx={{ mb: 2 }}>
+                            <Typography sx={overlineSx}>Subject</Typography>
+                            <Box
+                                component="input"
+                                type="text"
+                                value={subject}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSubject(e.target.value)}
+                                placeholder="e.g., Payment Reminder for {{productName}}"
+                                sx={fieldSx}
+                            />
+                        </Box>
+
+                        <Box sx={{ mb: 2 }}>
+                            <Typography sx={overlineSx}>Body</Typography>
+                            <Box
+                                component="textarea"
+                                value={body}
+                                onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setBody(e.target.value)}
+                                placeholder="Dear {{userName}}, your payment of {{principal}} is due on {{repayTime}}…"
+                                rows={8}
+                                sx={{ ...fieldSx, resize: 'none' }}
+                            />
+                        </Box>
+
+                        <Box sx={{ p: '10px 12px', border: '1px solid var(--line)', borderRadius: 'var(--r-md)', bgcolor: 'var(--paper-2)' }}>
+                            <Typography sx={{ ...overlineSx, mb: 0.75 }}>Available placeholders</Typography>
+                            {PLACEHOLDER_GROUPS.map(({ group, tokens }) => (
+                                <Box key={group} sx={{ display: 'flex', gap: 1, mb: 0.5, alignItems: 'flex-start' }}>
+                                    <Typography sx={{ font: '500 10px var(--font-mono)', color: 'var(--ink-3)', width: 60, mt: '2px', flexShrink: 0 }}>
+                                        {group}
+                                    </Typography>
+                                    <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                                        {tokens.map(t => (
+                                            <Box key={t} sx={{
+                                                font: '400 11px var(--font-mono)', color: 'var(--ink-2)',
+                                                bgcolor: 'var(--paper-3)', border: '1px solid var(--line-2)',
+                                                borderRadius: '3px', px: '5px', py: '1px',
+                                            }}>
+                                                {t}
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                </Box>
+                            ))}
+                        </Box>
                     </Box>
                 )}
 
+                {/* Templates */}
                 {tabIndex === 1 && (
                     <Box>
-                        <Box sx={{ display: 'flex', gap: 1, mb: 2 }}>
-                            <TextField
-                                size="small"
-                                label="Template Name"
+                        <Box sx={{ display: 'flex', gap: 1, mb: 2.5, alignItems: 'center' }}>
+                            <Box
+                                component="input"
+                                type="text"
                                 value={templateName}
-                                onChange={e => setTemplateName(e.target.value)}
+                                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setTemplateName(e.target.value)}
+                                placeholder="Template name…"
+                                sx={{ ...fieldSx, flex: 1 }}
                             />
-                            <Button variant="outlined" onClick={handleSaveTemplate}>
-                                Save Current
+                            <Button
+                                variant="outlined"
+                                size="small"
+                                onClick={handleSaveTemplate}
+                                sx={{
+                                    fontFamily: 'var(--font-sans)', fontSize: 12, height: 38, flexShrink: 0,
+                                    borderColor: 'var(--line)', color: 'var(--ink-2)', textTransform: 'none',
+                                    '&:hover': { borderColor: 'var(--ink-3)', color: 'var(--ink)', bgcolor: 'transparent' },
+                                }}
+                            >
+                                Save current
                             </Button>
                         </Box>
-                        <List>
-                            {templates.map(t => (
-                                <ListItemButton key={t.name} onClick={() => handleLoadTemplate(t)}>
-                                    <ListItemText
-                                        primary={
+
+                        {templates.length === 0 ? (
+                            <Typography sx={{ fontSize: 13, color: 'var(--ink-3)' }}>No saved templates.</Typography>
+                        ) : (
+                            <Box sx={{ border: '1px solid var(--line)', borderRadius: '4px', overflow: 'hidden' }}>
+                                {templates.map((t, i) => (
+                                    <Box
+                                        key={t.name}
+                                        onClick={() => handleLoadTemplate(t)}
+                                        sx={{
+                                            display: 'flex', alignItems: 'center', gap: 1.5,
+                                            px: 1.5, py: 1.25, cursor: 'pointer',
+                                            borderBottom: i < templates.length - 1 ? '1px solid var(--line-2)' : 'none',
+                                            '&:hover': { bgcolor: 'var(--paper-2)' },
+                                        }}
+                                    >
+                                        <Box sx={{ flex: 1, minWidth: 0 }}>
                                             <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                                {t.name}
+                                                <Typography sx={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', lineHeight: 1.2 }}>
+                                                    {t.name}
+                                                </Typography>
                                                 {t.isDefault && (
-                                                    <Chip label="Default" size="small" variant="outlined" sx={{ fontSize: 10, height: 18 }} />
+                                                    <Box sx={{ font: '500 9px var(--font-mono)', letterSpacing: '0.05em', color: 'var(--ink-3)', textTransform: 'uppercase' }}>
+                                                        default
+                                                    </Box>
                                                 )}
                                             </Box>
-                                        }
-                                        secondary={t.subject}
-                                    />
-                                    <ListItemSecondaryAction>
-                                        <IconButton edge="end" onClick={() => handleDeleteTemplate(t.name)}>
-                                            <DeleteIcon />
-                                        </IconButton>
-                                    </ListItemSecondaryAction>
-                                </ListItemButton>
-                            ))}
-                            {templates.length === 0 && (
-                                <Typography color="textSecondary">No saved templates</Typography>
-                            )}
-                        </List>
+                                            <Typography sx={{ fontSize: 12, color: 'var(--ink-3)', mt: '2px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                {t.subject}
+                                            </Typography>
+                                        </Box>
+                                        <Tooltip title="Delete template">
+                                            <IconButton
+                                                size="small"
+                                                onClick={(e) => { e.stopPropagation(); handleDeleteTemplate(t.name); }}
+                                                sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--danger)' } }}
+                                            >
+                                                <DeleteIcon sx={{ fontSize: 16 }} />
+                                            </IconButton>
+                                        </Tooltip>
+                                    </Box>
+                                ))}
+                            </Box>
+                        )}
                     </Box>
                 )}
 
+                {/* Preview */}
                 {tabIndex === 2 && (
                     <Box>
-                        <Typography variant="subtitle2" gutterBottom>
-                            Preview (first user: {selectedUsers[0]?.userName || 'N/A'})
+                        <Typography sx={{ ...overlineSx, mb: 1.5 }}>
+                            Preview — {selectedUsers[0]?.userName || 'no user selected'}
                         </Typography>
-                        <Typography variant="body2" sx={{ fontWeight: 'bold', mb: 1 }}>
-                            Subject: {subject.replace(/\{\{userName\}\}/g, selectedUsers[0]?.userName || '')}
-                        </Typography>
-                        <Box
-                            sx={{
-                                p: 2,
-                                bgcolor: 'grey.100',
-                                borderRadius: 1,
-                                whiteSpace: 'pre-wrap',
-                            }}
-                        >
+                        <Box sx={{ display: 'flex', alignItems: 'baseline', gap: 1, mb: 1.5 }}>
+                            <Typography component="span" sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.04em', color: 'var(--ink-3)', textTransform: 'uppercase' }}>
+                                Subject
+                            </Typography>
+                            <Typography sx={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
+                                {subject.replace(/\{\{userName\}\}/g, selectedUsers[0]?.userName || '')}
+                            </Typography>
+                        </Box>
+                        <Box sx={{
+                            p: '12px 14px', bgcolor: 'var(--paper-2)', border: '1px solid var(--line)',
+                            borderRadius: 'var(--r-md)', whiteSpace: 'pre-wrap',
+                            fontSize: 13, color: 'var(--ink)', fontFamily: 'var(--font-sans)', lineHeight: 1.6,
+                        }}>
                             {getPreview()}
                         </Box>
                     </Box>
                 )}
 
                 {error && (
-                    <Alert severity="error" sx={{ mt: 2 }}>
+                    <Typography sx={{ fontSize: 12, color: 'var(--danger)', mt: 2 }}>
                         {error}
-                    </Alert>
+                    </Typography>
                 )}
 
-                {sending && <LinearProgress sx={{ mt: 2 }} />}
-
+                {sending && (
+                    <LinearProgress sx={{
+                        mt: 2, bgcolor: 'var(--line)',
+                        '& .MuiLinearProgress-bar': { bgcolor: 'var(--accent)' },
+                    }} />
+                )}
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose} disabled={sending}>
+
+            <DialogActions sx={{ px: 3, pb: 2.5, gap: 1 }}>
+                <Button onClick={onClose} disabled={sending} sx={{ color: 'var(--ink-3)' }}>
                     Cancel
                 </Button>
                 <Button
                     variant="contained"
                     onClick={handleSend}
                     disabled={sending || !subject.trim() || !body.trim() || !selectedAccountId}
+                    sx={{ minWidth: 140 }}
                 >
-                    {sending ? 'Sending...' : `Send to ${selectedUsers.filter(u => u.email).length} Users`}
+                    {sending ? 'Sending…' : `Send to ${recipientCount}`}
                 </Button>
             </DialogActions>
         </Dialog>

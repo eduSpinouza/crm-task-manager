@@ -11,10 +11,8 @@ import TableRow from '@mui/material/TableRow';
 import Paper from '@mui/material/Paper';
 import IconButton from '@mui/material/IconButton';
 import Button from '@mui/material/Button';
-import Chip from '@mui/material/Chip';
 import Collapse from '@mui/material/Collapse';
 import Typography from '@mui/material/Typography';
-import Alert from '@mui/material/Alert';
 import CircularProgress from '@mui/material/CircularProgress';
 import Tooltip from '@mui/material/Tooltip';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
@@ -66,14 +64,10 @@ function kicksLast7Days(kickHistory: number[]): number {
 }
 
 function isSuspicious(history: LoginEvent[], kickHistory: number[]): boolean {
-    // Rule 1: 2+ distinct IPs with successful logins in last 24h
     const last24h = history.filter(e => e.success && Date.now() - e.timestamp < DAY_MS);
     const uniqueIPs = new Set(last24h.map(e => e.ip));
     if (uniqueIPs.size >= 2) return true;
-
-    // Rule 2: 3+ session kicks in last 7 days
     if (kicksLast7Days(kickHistory) >= 3) return true;
-
     return false;
 }
 
@@ -82,6 +76,25 @@ function formatTs(ts: number): string {
         month: 'short', day: 'numeric', year: 'numeric',
         hour: '2-digit', minute: '2-digit',
     });
+}
+
+const overlineSx = {
+    font: '500 10px var(--font-mono)',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase' as const,
+    color: 'var(--ink-3)',
+    mb: 1,
+};
+
+function Badge({ label, bg, color }: { label: string; bg: string; color: string }) {
+    return (
+        <Box component="span" sx={{
+            font: '500 10px var(--font-mono)', letterSpacing: '0.04em', textTransform: 'uppercase',
+            bgcolor: bg, color, borderRadius: '3px', px: '6px', py: '2px', display: 'inline-block',
+        }}>
+            {label}
+        </Box>
+    );
 }
 
 function UserRow({ user, currentUser, onRefresh }: {
@@ -126,78 +139,104 @@ function UserRow({ user, currentUser, onRefresh }: {
     };
 
     const rowBg = user.blocked
-        ? 'rgba(211,47,47,0.05)'
+        ? 'var(--danger-soft)'
         : suspicious
-            ? 'rgba(255,160,0,0.08)'
+            ? 'var(--warn-soft)'
             : undefined;
 
     return (
         <>
-            <TableRow sx={{ backgroundColor: rowBg, '& > *': { borderBottom: 'unset' } }}>
+            <TableRow sx={{ bgcolor: rowBg, '& > *': { borderBottom: 'unset' } }}>
                 <TableCell sx={{ width: 40, p: 0.5 }}>
-                    <IconButton size="small" onClick={() => setOpen(o => !o)}>
-                        {open ? <KeyboardArrowUpIcon fontSize="small" /> : <KeyboardArrowDownIcon fontSize="small" />}
+                    <IconButton size="small" onClick={() => setOpen(o => !o)}
+                        sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' } }}>
+                        {open
+                            ? <KeyboardArrowUpIcon sx={{ fontSize: 16 }} />
+                            : <KeyboardArrowDownIcon sx={{ fontSize: 16 }} />}
                     </IconButton>
                 </TableCell>
+
+                {/* Username */}
                 <TableCell>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <strong>{user.username}</strong>
-                        {isSelf && <Chip label="you" size="small" variant="outlined" sx={{ fontSize: '0.65rem' }} />}
+                        <Typography sx={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
+                            {user.username}
+                        </Typography>
+                        {isSelf && (
+                            <Box sx={{ font: '500 9px var(--font-mono)', letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                                you
+                            </Box>
+                        )}
                     </Box>
                 </TableCell>
+
+                {/* Role */}
                 <TableCell>
-                    <Chip
-                        label={user.role}
-                        size="small"
-                        color={user.role === 'admin' ? 'primary' : 'default'}
-                    />
+                    {user.role === 'admin'
+                        ? <Badge label="admin" bg="var(--accent-soft)" color="var(--accent)" />
+                        : <Badge label="user"  bg="var(--paper-3)"    color="var(--ink-3)" />}
                 </TableCell>
+
+                {/* Status */}
                 <TableCell>
-                    {user.blocked ? (
-                        <Chip label="Blocked" size="small" color="error" icon={<BlockIcon />} />
-                    ) : user.currentSession ? (
-                        <Chip label="Online" size="small" color="success" />
-                    ) : (
-                        <Chip label="Offline" size="small" variant="outlined" />
-                    )}
+                    {user.blocked
+                        ? <Badge label="Blocked" bg="var(--danger-soft)" color="var(--danger)" />
+                        : user.currentSession
+                            ? <Badge label="Online"  bg="var(--good-soft)"   color="var(--good-ink)" />
+                            : <Badge label="Offline" bg="var(--paper-2)"     color="var(--ink-3)" />}
                 </TableCell>
+
+                {/* Current session */}
                 <TableCell>
                     {user.currentSession ? (
                         <Box>
-                            <Typography variant="caption" display="block">{user.currentSession.ip}</Typography>
-                            <Typography variant="caption" color="text.secondary">
+                            <Typography sx={{ font: '400 12px var(--font-mono)', color: 'var(--ink-2)' }}>
+                                {user.currentSession.ip}
+                            </Typography>
+                            <Typography sx={{ font: '400 11px var(--font-mono)', color: 'var(--ink-3)', mt: '1px' }}>
                                 {formatTs(user.currentSession.createdAt)}
                             </Typography>
                         </Box>
-                    ) : '—'}
+                    ) : <Typography sx={{ fontSize: 13, color: 'var(--ink-3)' }}>—</Typography>}
                 </TableCell>
+
+                {/* Kicks 7d */}
                 <TableCell align="center">
-                    <Typography variant="body2" color={kicks7d >= 3 ? 'error' : 'text.primary'}>
+                    <Typography sx={{
+                        font: '500 12px var(--font-mono)',
+                        color: kicks7d >= 3 ? 'var(--danger)' : 'var(--ink-3)',
+                    }}>
                         {kicks7d}
                     </Typography>
                 </TableCell>
+
+                {/* Suspicious flag */}
                 <TableCell align="center">
                     {suspicious && (
                         <Tooltip title={
-                            kicksLast7Days(user.kickHistory) >= 3
+                            kicks7d >= 3
                                 ? '3+ session kicks in 7 days — possible credential sharing'
                                 : '2+ distinct IPs with successful logins in 24h'
                         }>
-                            <WarningAmberIcon color="warning" fontSize="small" />
+                            <WarningAmberIcon sx={{ fontSize: 16, color: 'var(--warn)' }} />
                         </Tooltip>
                     )}
                 </TableCell>
+
+                {/* Actions */}
                 <TableCell align="right">
                     {actionError && (
-                        <Typography variant="caption" color="error" sx={{ mr: 1 }}>{actionError}</Typography>
+                        <Typography sx={{ fontSize: 11, color: 'var(--danger)', mr: 1 }}>{actionError}</Typography>
                     )}
                     {deleteConfirm ? (
-                        <Box sx={{ display: 'inline-flex', gap: 0.5, alignItems: 'center' }}>
-                            <Typography variant="caption" sx={{ mr: 0.5 }}>Delete?</Typography>
-                            <Button size="small" color="error" variant="contained" onClick={handleDelete} disabled={actionLoading}>
+                        <Box sx={{ display: 'inline-flex', gap: 1, alignItems: 'center' }}>
+                            <Typography sx={{ fontSize: 12, color: 'var(--ink-3)' }}>Delete?</Typography>
+                            <Button size="small" variant="contained" color="error" onClick={handleDelete} disabled={actionLoading}
+                                sx={{ fontSize: 11, py: '3px', px: '10px' }}>
                                 Yes
                             </Button>
-                            <Button size="small" onClick={() => setDeleteConfirm(false)} disabled={actionLoading}>
+                            <Button size="small" onClick={() => setDeleteConfirm(false)} disabled={actionLoading}
+                                sx={{ fontSize: 11, color: 'var(--ink-3)', py: '3px' }}>
                                 No
                             </Button>
                         </Box>
@@ -208,39 +247,27 @@ function UserRow({ user, currentUser, onRefresh }: {
                                     {user.blocked ? (
                                         <Tooltip title="Unblock user">
                                             <span>
-                                                <IconButton
-                                                    size="small"
-                                                    color="success"
-                                                    onClick={() => handleBlock(false)}
-                                                    disabled={actionLoading}
-                                                >
-                                                    <LockOpenIcon fontSize="small" />
+                                                <IconButton size="small" onClick={() => handleBlock(false)} disabled={actionLoading}
+                                                    sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--good)' } }}>
+                                                    <LockOpenIcon sx={{ fontSize: 16 }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
                                     ) : (
                                         <Tooltip title="Block user">
                                             <span>
-                                                <IconButton
-                                                    size="small"
-                                                    color="warning"
-                                                    onClick={() => handleBlock(true)}
-                                                    disabled={actionLoading}
-                                                >
-                                                    <BlockIcon fontSize="small" />
+                                                <IconButton size="small" onClick={() => handleBlock(true)} disabled={actionLoading}
+                                                    sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--warn-ink)' } }}>
+                                                    <BlockIcon sx={{ fontSize: 16 }} />
                                                 </IconButton>
                                             </span>
                                         </Tooltip>
                                     )}
                                     <Tooltip title="Delete user">
                                         <span>
-                                            <IconButton
-                                                size="small"
-                                                color="error"
-                                                onClick={() => setDeleteConfirm(true)}
-                                                disabled={actionLoading}
-                                            >
-                                                <DeleteIcon fontSize="small" />
+                                            <IconButton size="small" onClick={() => setDeleteConfirm(true)} disabled={actionLoading}
+                                                sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--danger)' } }}>
+                                                <DeleteIcon sx={{ fontSize: 16 }} />
                                             </IconButton>
                                         </span>
                                     </Tooltip>
@@ -250,74 +277,73 @@ function UserRow({ user, currentUser, onRefresh }: {
                     )}
                 </TableCell>
             </TableRow>
+
+            {/* Expanded detail */}
             <TableRow>
-                <TableCell colSpan={8} sx={{ py: 0, backgroundColor: 'action.hover' }}>
+                <TableCell colSpan={8} sx={{ py: 0, bgcolor: 'var(--paper-2)' }}>
                     <Collapse in={open} timeout="auto" unmountOnExit>
-                        <Box sx={{ py: 2, px: 3, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        <Box sx={{ py: 2.5, px: 3, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+
                             {/* Login History */}
                             <Box sx={{ minWidth: 340, flex: 1 }}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Login History (last {user.loginHistory.length})
+                                <Typography sx={overlineSx}>
+                                    Login History ({user.loginHistory.length})
                                 </Typography>
                                 {user.loginHistory.length === 0 ? (
-                                    <Typography variant="caption" color="text.secondary">No login events recorded.</Typography>
+                                    <Typography sx={{ fontSize: 12, color: 'var(--ink-3)' }}>No login events recorded.</Typography>
                                 ) : (
-                                    <Table size="small" padding="none">
-                                        <TableHead>
-                                            <TableRow>
-                                                <TableCell sx={{ py: 0.5 }}></TableCell>
-                                                <TableCell sx={{ py: 0.5 }}>Time</TableCell>
-                                                <TableCell sx={{ py: 0.5 }}>IP</TableCell>
-                                                <TableCell sx={{ py: 0.5 }}>User Agent</TableCell>
-                                            </TableRow>
-                                        </TableHead>
-                                        <TableBody>
-                                            {user.loginHistory.map((ev, i) => (
-                                                <TableRow key={i}>
-                                                    <TableCell sx={{ pr: 1, py: 0.25 }}>
-                                                        {ev.success
-                                                            ? <CheckCircleOutlineIcon color="success" sx={{ fontSize: 14 }} />
-                                                            : <CancelIcon color="error" sx={{ fontSize: 14 }} />
-                                                        }
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 0.25, whiteSpace: 'nowrap' }}>
-                                                        <Typography variant="caption">{formatTs(ev.timestamp)}</Typography>
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 0.25, pr: 2 }}>
-                                                        <Typography variant="caption">{ev.ip}</Typography>
-                                                    </TableCell>
-                                                    <TableCell sx={{ py: 0.25 }}>
-                                                        <Typography variant="caption" sx={{
-                                                            maxWidth: 220, display: 'block',
-                                                            overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                                                        }}>
-                                                            {ev.userAgent}
-                                                        </Typography>
-                                                    </TableCell>
-                                                </TableRow>
-                                            ))}
-                                        </TableBody>
-                                    </Table>
-                                )}
-                            </Box>
-
-                            {/* Kick History */}
-                            <Box sx={{ minWidth: 220 }}>
-                                <Typography variant="subtitle2" gutterBottom>
-                                    Session Kicks (last {user.kickHistory.length})
-                                </Typography>
-                                {user.kickHistory.length === 0 ? (
-                                    <Typography variant="caption" color="text.secondary">No kicks recorded.</Typography>
-                                ) : (
-                                    <Box component="ul" sx={{ m: 0, pl: 2 }}>
-                                        {user.kickHistory.map((ts, i) => (
-                                            <li key={i}>
-                                                <Typography variant="caption">{formatTs(ts)}</Typography>
-                                            </li>
+                                    <Box sx={{ border: '1px solid var(--line)', borderRadius: '3px', overflow: 'hidden' }}>
+                                        {user.loginHistory.map((ev, i) => (
+                                            <Box key={i} sx={{
+                                                display: 'flex', alignItems: 'center', gap: 1.5,
+                                                px: 1.5, py: '6px',
+                                                borderBottom: i < user.loginHistory.length - 1 ? '1px solid var(--line-2)' : 'none',
+                                                bgcolor: ev.success ? undefined : 'var(--danger-soft)',
+                                            }}>
+                                                {ev.success
+                                                    ? <CheckCircleOutlineIcon sx={{ fontSize: 13, color: 'var(--good)', flexShrink: 0 }} />
+                                                    : <CancelIcon sx={{ fontSize: 13, color: 'var(--danger)', flexShrink: 0 }} />}
+                                                <Typography sx={{ font: '400 11px var(--font-mono)', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+                                                    {formatTs(ev.timestamp)}
+                                                </Typography>
+                                                <Typography sx={{ font: '500 11px var(--font-mono)', color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
+                                                    {ev.ip}
+                                                </Typography>
+                                                <Typography sx={{
+                                                    fontSize: 11, color: 'var(--ink-3)',
+                                                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1,
+                                                }}>
+                                                    {ev.userAgent}
+                                                </Typography>
+                                            </Box>
                                         ))}
                                     </Box>
                                 )}
                             </Box>
+
+                            {/* Kick History */}
+                            <Box sx={{ minWidth: 200 }}>
+                                <Typography sx={overlineSx}>
+                                    Session Kicks ({user.kickHistory.length})
+                                </Typography>
+                                {user.kickHistory.length === 0 ? (
+                                    <Typography sx={{ fontSize: 12, color: 'var(--ink-3)' }}>No kicks recorded.</Typography>
+                                ) : (
+                                    <Box sx={{ border: '1px solid var(--line)', borderRadius: '3px', overflow: 'hidden' }}>
+                                        {user.kickHistory.map((ts, i) => (
+                                            <Box key={i} sx={{
+                                                px: 1.5, py: '5px',
+                                                borderBottom: i < user.kickHistory.length - 1 ? '1px solid var(--line-2)' : 'none',
+                                            }}>
+                                                <Typography sx={{ font: '400 11px var(--font-mono)', color: 'var(--ink-3)' }}>
+                                                    {formatTs(ts)}
+                                                </Typography>
+                                            </Box>
+                                        ))}
+                                    </Box>
+                                )}
+                            </Box>
+
                         </Box>
                     </Collapse>
                 </TableCell>
@@ -336,9 +362,7 @@ export default function SecurityPanel({ currentUser }: Props) {
         setError('');
         try {
             const res = await axios.get('/api/admin/users');
-            if (res.data?.success) {
-                setUsers(res.data.users);
-            }
+            if (res.data?.success) setUsers(res.data.users);
         } catch (err: any) {
             setError(err.response?.data?.error || 'Failed to load security data');
         } finally {
@@ -346,27 +370,32 @@ export default function SecurityPanel({ currentUser }: Props) {
         }
     }, []);
 
-    React.useEffect(() => {
-        fetchUsers();
-    }, [fetchUsers]);
+    React.useEffect(() => { fetchUsers(); }, [fetchUsers]);
 
     const suspiciousCount = users.filter(u => isSuspicious(u.loginHistory, u.kickHistory)).length;
 
     return (
         <Box>
-            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-                <Typography variant="h6">Security Monitor</Typography>
+            {/* Header */}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2.5 }}>
+                <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 28, lineHeight: 1, color: 'var(--ink)' }}>
+                    Security Monitor
+                </Typography>
                 {suspiciousCount > 0 && (
-                    <Chip
-                        icon={<WarningAmberIcon />}
-                        label={`${suspiciousCount} suspicious`}
-                        color="warning"
-                        size="small"
-                    />
+                    <Box sx={{
+                        display: 'flex', alignItems: 'center', gap: '5px',
+                        font: '500 11px var(--font-mono)', letterSpacing: '0.04em',
+                        bgcolor: 'var(--warn-soft)', color: 'var(--warn-ink)',
+                        border: '1px solid var(--warn)', borderRadius: '3px',
+                        px: '8px', py: '3px',
+                    }}>
+                        <WarningAmberIcon sx={{ fontSize: 13 }} />
+                        {suspiciousCount} suspicious
+                    </Box>
                 )}
                 <Box sx={{ flex: 1 }} />
                 <Button
-                    startIcon={<RefreshIcon />}
+                    startIcon={loading ? <CircularProgress size={13} /> : <RefreshIcon sx={{ fontSize: '14px !important' }} />}
                     variant="outlined"
                     size="small"
                     onClick={fetchUsers}
@@ -377,14 +406,12 @@ export default function SecurityPanel({ currentUser }: Props) {
             </Box>
 
             {error && (
-                <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
-                    {error}
-                </Alert>
+                <Typography sx={{ fontSize: 12, color: 'var(--danger)', mb: 2 }}>{error}</Typography>
             )}
 
-            {loading ? (
+            {loading && users.length === 0 ? (
                 <Box sx={{ display: 'flex', justifyContent: 'center', py: 6 }}>
-                    <CircularProgress />
+                    <CircularProgress size={24} thickness={5} />
                 </Box>
             ) : (
                 <TableContainer component={Paper} variant="outlined">
@@ -392,13 +419,13 @@ export default function SecurityPanel({ currentUser }: Props) {
                         <TableHead>
                             <TableRow>
                                 <TableCell sx={{ width: 40 }} />
-                                <TableCell><strong>User</strong></TableCell>
-                                <TableCell><strong>Role</strong></TableCell>
-                                <TableCell><strong>Status</strong></TableCell>
-                                <TableCell><strong>Current Session</strong></TableCell>
-                                <TableCell align="center"><strong>Kicks (7d)</strong></TableCell>
-                                <TableCell align="center"><strong>Suspicious</strong></TableCell>
-                                <TableCell align="right"><strong>Actions</strong></TableCell>
+                                <TableCell>User</TableCell>
+                                <TableCell>Role</TableCell>
+                                <TableCell>Status</TableCell>
+                                <TableCell>Current Session</TableCell>
+                                <TableCell align="center">Kicks (7d)</TableCell>
+                                <TableCell align="center">Suspicious</TableCell>
+                                <TableCell align="right">Actions</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -413,7 +440,7 @@ export default function SecurityPanel({ currentUser }: Props) {
                             {users.length === 0 && (
                                 <TableRow>
                                     <TableCell colSpan={8} align="center">
-                                        <Typography color="text.secondary" sx={{ py: 2 }}>
+                                        <Typography sx={{ fontSize: 13, color: 'var(--ink-3)', py: 2 }}>
                                             No users found.
                                         </Typography>
                                     </TableCell>

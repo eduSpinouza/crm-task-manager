@@ -4,23 +4,26 @@ import * as React from 'react';
 import {
     Box, Button, Paper, Typography, Alert, CircularProgress,
     Table, TableBody, TableCell, TableContainer, TableHead, TableRow,
-    Checkbox, TablePagination, FormControl, InputLabel, Select, MenuItem,
-    Chip, Tooltip, Menu,
+    Checkbox, TablePagination, Select, MenuItem, IconButton,
+    Menu,
 } from '@mui/material';
 import axios from 'axios';
 import FollowUpDialog from './FollowUpDialog';
 import EmailDialog from './EmailDialog';
 import DebtorDetailDialog from './DebtorDetailDialog';
 import Snackbar from '@mui/material/Snackbar';
-import VisibilityIcon from '@mui/icons-material/Visibility';
-import IconButton from '@mui/material/IconButton';
+import Tooltip from '@mui/material/Tooltip';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
+import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
+import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import KeyboardArrowUpIcon from '@mui/icons-material/KeyboardArrowUp';
-import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import FileDownloadIcon from '@mui/icons-material/FileDownload';
 import { groupByUserId } from '@/lib/duplicateUtils';
 import { buildWorkbook, downloadXlsx, defaultFilename } from '@/lib/export/excelExport';
 import type { ExportUserData } from '@/lib/export/columns';
+import OverdueChip from './OverdueChip';
+import FollowResultChip from './FollowResultChip';
 
 interface UserData {
     taskId: number;
@@ -51,6 +54,9 @@ interface UserData {
 
 const COL_COUNT = 16;
 
+const fmt = (n: number | null | undefined) =>
+    n != null ? n.toLocaleString('en-US') : '—';
+
 interface DataRowProps {
     row: UserData;
     isSelected: boolean;
@@ -65,20 +71,50 @@ const DataRow = React.memo(function DataRow({ row, isSelected, onSelect, onViewD
 
     const rowCells = (r: UserData) => (
         <>
-            <TableCell>{r.userName}</TableCell>
-            <TableCell>{r.email || '-'}</TableCell>
-            <TableCell>{r.phone}</TableCell>
+            <TableCell>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <Box component="span" sx={{ fontWeight: 500, color: 'var(--ink)' }}>{r.userName}</Box>
+                    {isDuplicateGroup && r === row && (
+                        <Box
+                            component="span"
+                            onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
+                            sx={{
+                                display: 'inline-flex', alignItems: 'center', gap: '2px',
+                                font: '500 10px var(--font-mono)',
+                                letterSpacing: '0.06em',
+                                color: 'var(--warn-ink)',
+                                bgcolor: 'var(--warn-soft)',
+                                px: '5px', py: '1px',
+                                borderRadius: '2px',
+                                cursor: 'pointer',
+                                userSelect: 'none',
+                                flexShrink: 0,
+                            }}
+                        >
+                            {duplicates.length + 1} loans
+                            {open ? <KeyboardArrowUpIcon sx={{ fontSize: 11 }} /> : <KeyboardArrowDownIcon sx={{ fontSize: 11 }} />}
+                        </Box>
+                    )}
+                </Box>
+            </TableCell>
+            <TableCell>
+                <Box sx={{ lineHeight: 1.5 }}>
+                    <Box sx={{ fontSize: 13 }}>{r.email || 'no email'}</Box>
+                    <Box sx={{ fontSize: 11, color: 'var(--ink-3)', fontVariantNumeric: 'tabular-nums' }}>{r.phone}</Box>
+                </Box>
+            </TableCell>
             <TableCell>{r.appName || '-'}</TableCell>
             <TableCell>{r.productName}</TableCell>
-            <TableCell align="right">{r.totalAmount}</TableCell>
-            <TableCell align="right">{r.repayAmount}</TableCell>
-            <TableCell align="right">{r.overdueFee}</TableCell>
-            <TableCell align="right">{r.totalExtensionAmount ?? '-'}</TableCell>
-            <TableCell align="right">{r.overdueDay}</TableCell>
+            <TableCell align="right" className="tnum">{fmt(r.totalAmount)}</TableCell>
+            <TableCell align="right" className="tnum" sx={{ color: r.overdueDay > 0 ? 'var(--danger)' : undefined, fontWeight: r.overdueDay > 0 ? 600 : undefined }}>
+                {fmt(r.repayAmount)}
+            </TableCell>
+            <TableCell align="right" className="tnum">{fmt(r.overdueFee)}</TableCell>
+            <TableCell align="right" className="tnum">{r.totalExtensionAmount != null ? fmt(r.totalExtensionAmount) : '—'}</TableCell>
+            <TableCell><OverdueChip days={r.overdueDay} /></TableCell>
             <TableCell>{r.repayTime}</TableCell>
             <TableCell>{r.stageName}</TableCell>
-            <TableCell>{r.followResult}</TableCell>
-            <TableCell>{r.note}</TableCell>
+            <TableCell><FollowResultChip value={r.followResult} /></TableCell>
         </>
     );
 
@@ -92,46 +128,60 @@ const DataRow = React.memo(function DataRow({ row, isSelected, onSelect, onViewD
                 sx={{
                     cursor: 'pointer',
                     '& > *': isDuplicateGroup ? { borderBottom: 'unset' } : {},
-                    bgcolor: isDuplicateGroup ? 'rgba(255,160,0,0.07)' : undefined,
                 }}
             >
                 <TableCell padding="checkbox">
                     <Checkbox checked={isSelected} />
                 </TableCell>
-                <TableCell padding="checkbox" sx={{ whiteSpace: 'nowrap' }}>
-                    {isDuplicateGroup ? (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
-                            <Tooltip title={`${duplicates.length + 1} repayment plans share this user ID — click to expand`}>
-                                <Chip
-                                    icon={<WarningAmberIcon />}
-                                    label={`${duplicates.length + 1} dup`}
-                                    size="small"
-                                    color="warning"
-                                    onClick={e => { e.stopPropagation(); setOpen(o => !o); }}
-                                    onDelete={e => { e.stopPropagation(); setOpen(o => !o); }}
-                                    deleteIcon={open ? <KeyboardArrowUpIcon /> : <KeyboardArrowDownIcon />}
-                                />
-                            </Tooltip>
-                        </Box>
-                    ) : null}
-                </TableCell>
-                <TableCell padding="checkbox">
-                    <IconButton size="small" onClick={e => { e.stopPropagation(); onViewDetail(row); }}>
-                        <VisibilityIcon fontSize="small" />
-                    </IconButton>
+                <TableCell sx={{ width: 40, px: 1, textAlign: 'center' }}>
+                    <Tooltip title="View details" placement="right">
+                        <IconButton
+                            size="small"
+                            onClick={e => { e.stopPropagation(); onViewDetail(row); }}
+                            sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--accent)', bgcolor: 'var(--accent-soft)' } }}
+                        >
+                            <OpenInNewIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
+                    </Tooltip>
                 </TableCell>
                 {rowCells(row)}
             </TableRow>
 
             {/* Collapsed sibling rows */}
             {isDuplicateGroup && duplicates.map(dup => (
-                <TableRow key={dup.taskId} sx={{ display: open ? undefined : 'none', bgcolor: 'rgba(255,160,0,0.04)' }}>
+                <TableRow key={dup.taskId} sx={{ display: open ? undefined : 'none' }}>
                     <TableCell padding="checkbox" />
-                    <TableCell padding="checkbox" />
-                    <TableCell padding="checkbox">
-                        <IconButton size="small" onClick={e => { e.stopPropagation(); onViewDetail(dup); }}>
-                            <VisibilityIcon fontSize="small" />
-                        </IconButton>
+                    <TableCell
+                        sx={{
+                            width: 80,
+                            pr: '12px',
+                            '.view-label': {
+                                maxWidth: 0,
+                                overflow: 'hidden',
+                                opacity: 0,
+                                transition: 'max-width 150ms ease, opacity 150ms ease',
+                                whiteSpace: 'nowrap',
+                            },
+                            'tr:hover & .view-label': { maxWidth: 40, opacity: 1 },
+                        }}
+                    >
+                        <Button
+                            size="small"
+                            startIcon={<OpenInNewIcon sx={{ fontSize: '13px !important' }} />}
+                            onClick={e => { e.stopPropagation(); onViewDetail(dup); }}
+                            sx={{
+                                minWidth: 0,
+                                fontSize: 11,
+                                fontWeight: 500,
+                                color: 'var(--ink-3)',
+                                px: '8px',
+                                py: '4px',
+                                borderRadius: '4px',
+                                '&:hover': { color: 'var(--accent)', bgcolor: 'var(--accent-soft)' },
+                            }}
+                        >
+                            <span className="view-label">View</span>
+                        </Button>
                     </TableCell>
                     {rowCells(dup)}
                 </TableRow>
@@ -224,8 +274,8 @@ export default function UserListTable() {
         onProgress?: (loaded: number, total: number) => void
     ): Promise<UserData[]> => {
         setLoadingEmails(true);
-        const BATCH_SIZE = 5; // Concurrent requests
-        const DELAY_MS = 100; // Delay between batches
+        const BATCH_SIZE = 15; // Concurrent requests
+        const DELAY_MS = 0;   // No delay — dial back to 50–100ms if external API returns 429s
 
         const results = [...records];
 
@@ -451,78 +501,170 @@ export default function UserListTable() {
         }
     }, [filteredRows]);
 
-    return (
-        <Paper sx={{ width: '100%', p: 2 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                <Typography variant="h6">User List</Typography>
-                <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Button
-                        variant="outlined"
-                        startIcon={exporting ? <CircularProgress size={16} /> : <FileDownloadIcon />}
-                        disabled={loading || loadingEmails || exporting || rows.length === 0}
-                        onClick={(e) => setExportMenuAnchor(e.currentTarget)}
-                    >
-                        {exporting ? 'Exporting…' : 'Export'}
-                    </Button>
-                    <Menu
-                        anchorEl={exportMenuAnchor}
-                        open={Boolean(exportMenuAnchor)}
-                        onClose={() => setExportMenuAnchor(null)}
-                    >
-                        <MenuItem onClick={handleExportClick('excel')}>
-                            Download Excel (.xlsx)
-                        </MenuItem>
-                        <MenuItem onClick={handleExportClick('sheets')}>
-                            Export to Google Sheets
-                        </MenuItem>
-                    </Menu>
-                    <Button
-                        variant="outlined"
-                        disabled={selected.length === 0}
-                        onClick={() => setIsEmailDialogOpen(true)}
-                    >
-                        Send Email (<span className="notranslate">{selected.length}</span>)
-                    </Button>
-                    <Button
-                        variant="contained"
-                        disabled={selected.length === 0}
-                        onClick={() => setIsDialogOpen(true)}
-                    >
-                        Add Follow Up (<span className="notranslate">{selected.length}</span>)
-                    </Button>
-                </Box>
-            </Box>
+    const selectedRows = React.useMemo(
+        () => rows.filter(r => selectedSet.has(r.taskId)),
+        [rows, selectedSet]
+    );
+    const selectionTotalDue = React.useMemo(
+        () => selectedRows.reduce((sum, r) => sum + (r.repayAmount || 0), 0),
+        [selectedRows]
+    );
+    const selectionMissingEmail = React.useMemo(
+        () => selectedRows.filter(r => !r.email).length,
+        [selectedRows]
+    );
 
-            {/* Filters */}
-            <Box sx={{ display: 'flex', gap: 2, mb: 2, flexWrap: 'wrap' }}>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>App Name</InputLabel>
+    const handleExportSelected = () => {
+        const wb = buildWorkbook(selectedRows as ExportUserData[]);
+        downloadXlsx(wb, defaultFilename());
+        setSnackbar({ open: true, message: `Exported ${selectedRows.length} rows to Excel`, severity: 'success' });
+    };
+
+    return (
+        <Paper sx={{ width: '100%', p: 0 }}>
+            {/* ── Section header ── */}
+            <Box sx={{ bgcolor: 'var(--paper-2)', px: 3, pt: 2.5, pb: 2, borderBottom: '1px solid var(--line)' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'baseline', gap: '12px', borderLeft: '3px solid var(--accent)', pl: 1.5 }}>
+                        <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 28, lineHeight: 1, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
+                            Debtors
+                        </Typography>
+                        {rows.length > 0 && (
+                            <Typography sx={{ font: '500 11px var(--font-mono)', color: 'var(--ink-3)', letterSpacing: '0.04em' }}>
+                                {filteredRows.length !== rows.length
+                                    ? `${filteredRows.length} / ${rows.length}`
+                                    : rows.length} total
+                            </Typography>
+                        )}
+                    </Box>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                        <Button
+                            variant="outlined"
+                            startIcon={exporting ? <CircularProgress size={16} /> : <FileDownloadIcon />}
+                            disabled={loading || loadingEmails || exporting || rows.length === 0}
+                            onClick={(e) => setExportMenuAnchor(e.currentTarget)}
+                        >
+                            {exporting ? 'Exporting…' : 'Export'}
+                        </Button>
+                        <Menu
+                            anchorEl={exportMenuAnchor}
+                            open={Boolean(exportMenuAnchor)}
+                            onClose={() => setExportMenuAnchor(null)}
+                        >
+                            <MenuItem onClick={handleExportClick('excel')}>
+                                Download Excel (.xlsx)
+                            </MenuItem>
+                            <MenuItem onClick={handleExportClick('sheets')}>
+                                Export to Google Sheets
+                            </MenuItem>
+                        </Menu>
+                        <Button
+                            variant="outlined"
+                            disabled={selected.length === 0}
+                            onClick={() => setIsEmailDialogOpen(true)}
+                        >
+                            Send Email (<span className="notranslate">{selected.length}</span>)
+                        </Button>
+                        <Button
+                            variant="contained"
+                            disabled={selected.length === 0}
+                            onClick={() => setIsDialogOpen(true)}
+                        >
+                            Add Follow Up (<span className="notranslate">{selected.length}</span>)
+                        </Button>
+                    </Box>
+                </Box>
+
+                {/* Filters + page nav */}
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: 2 }}>
+                <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', alignItems: 'flex-end' }}>
+                <Box>
+                    <Typography sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', mb: 0.5 }}>
+                        App Name
+                    </Typography>
                     <Select
+                        size="small"
                         value={filterAppName}
-                        label="App Name"
                         onChange={(e) => setFilterAppName(e.target.value)}
+                        displayEmpty
+                        sx={{ minWidth: 150 }}
                     >
                         <MenuItem value="">All</MenuItem>
                         {[...new Set(rows.map(r => r.appName).filter(Boolean))].map(app => (
                             <MenuItem key={app} value={app}>{app}</MenuItem>
                         ))}
                     </Select>
-                </FormControl>
-                <FormControl size="small" sx={{ minWidth: 150 }}>
-                    <InputLabel>Overdue Days</InputLabel>
+                </Box>
+                <Box>
+                    <Typography sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', mb: 0.5 }}>
+                        Overdue Days
+                    </Typography>
                     <Select
+                        size="small"
                         value={filterOverdueDay}
-                        label="Overdue Days"
                         onChange={(e) => setFilterOverdueDay(e.target.value)}
+                        displayEmpty
+                        sx={{ minWidth: 150 }}
                     >
                         <MenuItem value="">All</MenuItem>
                         {[...new Set(rows.map(r => r.overdueDay).filter(d => d !== undefined))].sort((a, b) => a - b).map(day => (
                             <MenuItem key={day} value={String(day)}>{day} days</MenuItem>
                         ))}
                     </Select>
-                </FormControl>
-            </Box>
+                </Box>
+                </Box> {/* end filters */}
 
+                {/* Compact page nav + rows per page */}
+                {filteredRows.length > 0 && (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        {/* Rows per page */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                            <Typography sx={{ font: '500 10px var(--font-mono)', letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
+                                Rows
+                            </Typography>
+                            <Select
+                                size="small"
+                                value={pageSize}
+                                onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}
+                                sx={{ font: '500 11px var(--font-mono)', minWidth: 64, '& .MuiSelect-select': { py: '4px' } }}
+                            >
+                                {[50, 100, 250, 500].map(n => (
+                                    <MenuItem key={n} value={n} sx={{ font: '500 11px var(--font-mono)' }}>{n}</MenuItem>
+                                ))}
+                            </Select>
+                        </Box>
+
+                        <Box sx={{ width: '1px', height: 20, bgcolor: 'var(--line)' }} />
+
+                        {/* Prev / next */}
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                            <IconButton
+                                size="small"
+                                onClick={() => setPage(p => Math.max(0, p - 1))}
+                                disabled={page === 0}
+                                sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' }, '&.Mui-disabled': { color: 'var(--line)' } }}
+                            >
+                                <ChevronLeftIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                            <Typography sx={{ font: '500 11px var(--font-mono)', color: 'var(--ink-3)', whiteSpace: 'nowrap', minWidth: 80, textAlign: 'center' }}>
+                                {page * pageSize + 1}–{Math.min((page + 1) * pageSize, filteredRows.length)} of {filteredRows.length}
+                            </Typography>
+                            <IconButton
+                                size="small"
+                                onClick={() => setPage(p => p + 1)}
+                                disabled={(page + 1) * pageSize >= filteredRows.length}
+                                sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' }, '&.Mui-disabled': { color: 'var(--line)' } }}
+                            >
+                                <ChevronRightIcon sx={{ fontSize: 18 }} />
+                            </IconButton>
+                        </Box>
+                    </Box>
+                )}
+                </Box> {/* end filters+nav row */}
+            </Box> {/* end section header */}
+
+            {/* ── Content area ── */}
+            <Box sx={{ px: 2, pt: 1.5 }}>
             {!hasToken && (
                 <Alert severity="warning" sx={{ mb: 2 }}>
                     Please configure the <strong>External API Token</strong> in the dashboard settings (top right) to view data.
@@ -532,25 +674,29 @@ export default function UserListTable() {
             {hasToken && (
                 <>
                     {isLoading ? (
-                        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', p: 4, gap: 2 }}>
-                            <CircularProgress />
-                            <Typography variant="body2" color="text.secondary">
-                                {loadProgress.total > 0
-                                    ? `${loadProgress.phase} ${loadProgress.loaded}/${loadProgress.total} rows…`
-                                    : `${loadProgress.phase || 'Loading'}…`}
-                            </Typography>
+                        <Box sx={{ px: 0 }}>
+                            {/* Progress bar */}
+                            <Box sx={{ height: 2, bgcolor: 'var(--line-2)', overflow: 'hidden' }}>
+                                <Box sx={{
+                                    height: '100%',
+                                    bgcolor: 'var(--accent)',
+                                    width: loadProgress.total > 0
+                                        ? `${Math.round((loadProgress.loaded / loadProgress.total) * 100)}%`
+                                        : '35%',
+                                    transition: 'width 400ms ease',
+                                }} />
+                            </Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 2, p: '20px 24px' }}>
+                                <CircularProgress size={16} thickness={5} />
+                                <Typography sx={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                                    {loadProgress.total > 0
+                                        ? `${loadProgress.phase} · ${loadProgress.loaded} / ${loadProgress.total} rows`
+                                        : `${loadProgress.phase || 'Loading'}…`}
+                                </Typography>
+                            </Box>
                         </Box>
                     ) : (
                         <>
-                        <TablePagination
-                            component="div"
-                            count={filteredRows.length}
-                            page={page}
-                            onPageChange={handleChangePage}
-                            rowsPerPage={pageSize}
-                            onRowsPerPageChange={handleChangeRowsPerPage}
-                            rowsPerPageOptions={[50, 100, 250, 500]}
-                        />
                         <Box
                             ref={topScrollRef}
                             onScroll={handleTopScroll}
@@ -558,33 +704,53 @@ export default function UserListTable() {
                         >
                             <Box sx={{ width: tableScrollWidth, height: 1 }} />
                         </Box>
+                        <Box sx={{ border: '1px solid var(--line)', borderRadius: '4px', overflow: 'hidden' }}>
                         <TableContainer ref={tableContainerCallbackRef} onScroll={handleTableScroll}>
                             <Table size="small">
                                 <TableHead>
-                                    <TableRow>
-                                        <TableCell padding="checkbox">
+                                    {/* ── Group row ── */}
+                                    <TableRow sx={{ bgcolor: 'var(--paper-2)' }}>
+                                        <TableCell padding="checkbox" sx={{ borderBottom: 0, py: '7px' }} />
+                                        <TableCell sx={{ borderBottom: 0, py: '7px', width: 80 }} />
+                                        <TableCell colSpan={2} align="center" sx={{ borderBottom: 0, borderLeft: '1px solid var(--line)', py: '7px', font: '500 10px var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                                            Debtor
+                                        </TableCell>
+                                        <TableCell colSpan={3} align="center" sx={{ borderBottom: 0, borderLeft: '1px solid var(--line)', py: '7px', font: '500 10px var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                                            Loan
+                                        </TableCell>
+                                        <TableCell colSpan={4} align="center" sx={{ borderBottom: 0, borderLeft: '1px solid var(--line)', py: '7px', font: '500 10px var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                                            Amounts
+                                        </TableCell>
+                                        <TableCell colSpan={3} align="center" sx={{ borderBottom: 0, borderLeft: '1px solid var(--line)', py: '7px', font: '500 10px var(--font-mono)', letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-3)' }}>
+                                            Status
+                                        </TableCell>
+                                    </TableRow>
+                                    {/* ── Column row ── */}
+                                    <TableRow sx={{ bgcolor: 'var(--paper-2)' }}>
+                                        <TableCell padding="checkbox" sx={{ py: '6px' }}>
                                             <Checkbox
+                                                size="small"
                                                 indeterminate={selected.length > 0 && selected.length < filteredRows.length}
                                                 checked={filteredRows.length > 0 && selected.length === filteredRows.length}
                                                 onChange={handleSelectAll}
                                             />
                                         </TableCell>
-                                        <TableCell padding="checkbox" />
-                                        <TableCell padding="checkbox" />
-                                        <TableCell>User Name</TableCell>
-                                        <TableCell>Email</TableCell>
-                                        <TableCell>Phone</TableCell>
-                                        <TableCell>App Name</TableCell>
-                                        <TableCell>Product</TableCell>
-                                        <TableCell align="right">Contract Amount</TableCell>
-                                        <TableCell align="right">Total Amount</TableCell>
-                                        <TableCell align="right">Overdue Fee</TableCell>
-                                        <TableCell align="right">Extension Amount</TableCell>
-                                        <TableCell align="right">Overdue Days</TableCell>
-                                        <TableCell>Repay Time</TableCell>
-                                        <TableCell>Stage</TableCell>
-                                        <TableCell>Result</TableCell>
-                                        <TableCell>Note</TableCell>
+                                        <TableCell sx={{ py: '6px', width: 40, fontSize: 11, fontWeight: 500, color: 'var(--ink-2)' }}>Details</TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Name</TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
+                                            Email
+                                            <Box component="span" sx={{ color: 'var(--ink-3)', fontSize: 10, fontFamily: 'var(--font-mono)', ml: '4px' }}>/ phone</Box>
+                                        </TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>App</TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Product</TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Due</TableCell>
+                                        <TableCell align="right" sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Contract</TableCell>
+                                        <TableCell align="right" sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Total due</TableCell>
+                                        <TableCell align="right" sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Overdue fee</TableCell>
+                                        <TableCell align="right" sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Ext.</TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Overdue</TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Stage</TableCell>
+                                        <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Last result</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -628,11 +794,14 @@ export default function UserListTable() {
                             rowsPerPage={pageSize}
                             onRowsPerPageChange={handleChangeRowsPerPage}
                             rowsPerPageOptions={[50, 100, 250, 500]}
+                            sx={{ bgcolor: 'var(--paper-2)', borderTop: '1px solid var(--line)' }}
                         />
+                        </Box>
                         </>
                     )}
                 </>
             )}
+            </Box> {/* end content area */}
 
             <FollowUpDialog
                 open={isDialogOpen}
@@ -677,6 +846,80 @@ export default function UserListTable() {
                     {snackbar?.message}
                 </Alert>
             </Snackbar>
+
+            {/* Sticky selection bar */}
+            {selected.length > 0 && (
+                <Box
+                    sx={{
+                        position: 'fixed',
+                        bottom: 16,
+                        left: '50%',
+                        transform: 'translateX(-50%)',
+                        minWidth: 640,
+                        maxWidth: 900,
+                        bgcolor: 'var(--ink)',
+                        color: 'var(--paper)',
+                        borderRadius: 'var(--r-md)',
+                        boxShadow: 'var(--shadow-modal)',
+                        px: '20px',
+                        height: 48,
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '12px',
+                        zIndex: 1250,
+                        animation: 'selectionBarIn var(--dur-base, 180ms) var(--ease, cubic-bezier(0.2,0,0,1)) both',
+                        '@keyframes selectionBarIn': {
+                            from: { opacity: 0, transform: 'translateX(-50%) translateY(12px)' },
+                            to:   { opacity: 1, transform: 'translateX(-50%) translateY(0)' },
+                        },
+                    }}
+                >
+                    <Box component="strong" sx={{ fontSize: 12, fontWeight: 600, color: 'var(--paper)', whiteSpace: 'nowrap' }}>
+                        {selected.length} selected
+                    </Box>
+                    <Box sx={{ fontSize: 12, color: 'rgba(255,255,255,0.55)', whiteSpace: 'nowrap' }}>
+                        · total due{' '}
+                        <Box component="strong" sx={{ color: 'var(--paper)', fontVariantNumeric: 'tabular-nums' }}>
+                            {fmt(selectionTotalDue)}
+                        </Box>
+                    </Box>
+                    {selectionMissingEmail > 0 && (
+                        <Box sx={{ fontSize: 12, color: 'oklch(82% 0.15 70)', whiteSpace: 'nowrap' }}>
+                            · {selectionMissingEmail} without email
+                        </Box>
+                    )}
+                    <Box sx={{ color: 'rgba(255,255,255,0.2)', userSelect: 'none' }}>|</Box>
+                    <Button
+                        size="small"
+                        onClick={() => setIsDialogOpen(true)}
+                        sx={{ color: 'var(--paper)', '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' } }}
+                    >
+                        Follow up
+                    </Button>
+                    <Button
+                        size="small"
+                        onClick={() => setIsEmailDialogOpen(true)}
+                        sx={{ color: 'var(--paper)', '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' } }}
+                    >
+                        Send email
+                    </Button>
+                    <Button
+                        size="small"
+                        onClick={handleExportSelected}
+                        sx={{ color: 'var(--paper)', '&:hover': { bgcolor: 'rgba(255,255,255,0.08)' } }}
+                    >
+                        Export selected
+                    </Button>
+                    <Box sx={{ flex: 1 }} />
+                    <Button
+                        size="small"
+                        onClick={() => setSelected([])}
+                        sx={{ color: 'var(--ink-3)', '&:hover': { bgcolor: 'rgba(255,255,255,0.08)', color: 'var(--paper)' } }}
+                    >
+                        Clear
+                    </Button>
+                </Box>
+            )}
         </Paper>
     );
 }

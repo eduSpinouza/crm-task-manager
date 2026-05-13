@@ -83,6 +83,10 @@ This interface exists in three places and must stay compatible:
 | `GOOGLE_SHEETS_OAUTH_REDIRECT_URI` | Sheets OAuth callback URL (e.g. `http://localhost:3000/api/auth/sheets/callback`) |
 | `EMAIL_TEST_OVERRIDE` | Optional: redirect first send to this address for smoke testing |
 
+### Known Limitations / Future Work
+
+- **`UserManagementDialog` pagination & search** — the user table currently loads all users at once and scrolls within a fixed-height container (440px, ~13 rows). This is fine up to ~50 users. When the user list grows significantly, add client-side search/filter (by username or role) and pagination or virtual scrolling. The API route (`GET /api/admin/users`) already returns all users in one call, so filtering can stay client-side until the list gets large enough to warrant server-side paging.
+
 ### Deployment
 
 Vercel auto-deploys from the `master` branch of `eduSpinouza/crm-task-manager`. Always run `npm run build` locally before pushing.

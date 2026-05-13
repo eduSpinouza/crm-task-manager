@@ -5,7 +5,6 @@ import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import DialogActions from '@mui/material/DialogActions';
 import DialogContent from '@mui/material/DialogContent';
-import DialogTitle from '@mui/material/DialogTitle';
 import TextField from '@mui/material/TextField';
 import MenuItem from '@mui/material/MenuItem';
 import Table from '@mui/material/Table';
@@ -21,7 +20,6 @@ import EditIcon from '@mui/icons-material/Edit';
 import CheckIcon from '@mui/icons-material/Check';
 import CloseIcon from '@mui/icons-material/Close';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
-import PeopleIcon from '@mui/icons-material/People';
 import CardMembershipIcon from '@mui/icons-material/CardMembership';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -49,28 +47,32 @@ interface Props {
     onClose: () => void;
 }
 
+const overlineSx = {
+    font: '500 10px var(--font-mono)',
+    letterSpacing: '0.06em',
+    textTransform: 'uppercase' as const,
+    color: 'var(--ink-3)',
+    mb: 1,
+};
+
 export default function UserManagementDialog({ open, onClose }: Props) {
     const [users, setUsers] = React.useState<ManagedUser[]>([]);
     const [loading, setLoading] = React.useState(false);
     const [error, setError] = React.useState('');
     const [success, setSuccess] = React.useState('');
 
-    // New user form
     const [showForm, setShowForm] = React.useState(false);
     const [newUsername, setNewUsername] = React.useState('');
     const [newPassword, setNewPassword] = React.useState('');
     const [newRole, setNewRole] = React.useState<'admin' | 'user'>('user');
     const [creating, setCreating] = React.useState(false);
 
-    // Delete confirmation
     const [deleteTarget, setDeleteTarget] = React.useState<string | null>(null);
 
-    // Rename
     const [renameTarget, setRenameTarget] = React.useState<string | null>(null);
     const [renameValue, setRenameValue] = React.useState('');
     const [renaming, setRenaming] = React.useState(false);
 
-    // License management
     const [licenseTarget, setLicenseTarget] = React.useState<string | null>(null);
     const [selectedDays, setSelectedDays] = React.useState<number>(30);
     const [licenseStartDate, setLicenseStartDate] = React.useState<string>('');
@@ -112,7 +114,7 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                 password: newPassword,
                 role: newRole,
             });
-            setSuccess(`User "${newUsername}" created successfully`);
+            setSuccess(`User "${newUsername}" created`);
             setNewUsername('');
             setNewPassword('');
             setNewRole('user');
@@ -150,7 +152,7 @@ export default function UserManagementDialog({ open, onClose }: Props) {
         setError('');
         try {
             await axios.delete('/api/admin/users', { data: { username } });
-            setSuccess(`User "${username}" deleted`);
+            setSuccess(`"${username}" deleted`);
             setDeleteTarget(null);
             fetchUsers();
         } catch (err: any) {
@@ -186,29 +188,28 @@ export default function UserManagementDialog({ open, onClose }: Props) {
 
     const formatDate = (ts?: number) => {
         if (!ts) return '—';
-        return new Date(ts).toLocaleDateString('en-US', {
-            month: 'short',
-            day: 'numeric',
-            year: 'numeric',
-        });
+        return new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
 
     const formatLicense = (license?: LicenseConfig | null): React.ReactNode => {
         const status = getLicenseStatus(license);
         const days = getLicenseDaysLeft(license);
-        if (status === 'none') return <Typography variant="body2" color="text.secondary">—</Typography>;
+        if (status === 'none') return <Typography sx={{ fontSize: 13, color: 'var(--ink-3)' }}>—</Typography>;
         if (status === 'expired') return <Chip label="Expired" size="small" color="error" />;
         const color = status === 'critical' ? 'error' : status === 'warning' ? 'warning' : 'success';
-        return <Chip label={`${days} days left`} size="small" color={color} />;
+        return <Chip label={`${days}d left`} size="small" color={color} />;
     };
 
     return (
         <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-            <DialogTitle sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <PeopleIcon />
-                User Management
-            </DialogTitle>
-            <DialogContent>
+            {/* Title */}
+            <Box sx={{ px: 3, pt: 3, pb: 0 }}>
+                <Typography sx={{ fontFamily: 'var(--font-display)', fontSize: 22, color: 'var(--ink)', lineHeight: 1, mb: 2.5 }}>
+                    User Management
+                </Typography>
+            </Box>
+
+            <DialogContent sx={{ pt: 0, overflow: 'visible' }}>
                 {error && (
                     <Alert severity="error" sx={{ mb: 2 }} onClose={() => setError('')}>
                         {error}
@@ -222,19 +223,20 @@ export default function UserManagementDialog({ open, onClose }: Props) {
 
                 {loading ? (
                     <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-                        <CircularProgress />
+                        <CircularProgress size={24} />
                     </Box>
                 ) : (
                     <>
-                        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2 }}>
-                            <Table size="small">
+                        {/* Users table */}
+                        <TableContainer component={Paper} variant="outlined" sx={{ mb: 2, maxHeight: 440, overflow: 'auto' }}>
+                            <Table size="small" stickyHeader>
                                 <TableHead>
-                                    <TableRow>
-                                        <TableCell><strong>Username</strong></TableCell>
-                                        <TableCell><strong>Role</strong></TableCell>
-                                        <TableCell><strong>Created</strong></TableCell>
-                                        <TableCell><strong>License</strong></TableCell>
-                                        <TableCell align="right"><strong>Actions</strong></TableCell>
+                                    <TableRow sx={{ bgcolor: 'var(--paper-2)' }}>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>Username</TableCell>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>Role</TableCell>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>Created</TableCell>
+                                        <TableCell sx={{ bgcolor: 'var(--paper-2)' }}>License</TableCell>
+                                        <TableCell align="right" sx={{ bgcolor: 'var(--paper-2)' }}>Actions</TableCell>
                                     </TableRow>
                                 </TableHead>
                                 <TableBody>
@@ -263,7 +265,9 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                                         </IconButton>
                                                     </Box>
                                                 ) : (
-                                                    user.username
+                                                    <Typography sx={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)' }}>
+                                                        {user.username}
+                                                    </Typography>
                                                 )}
                                             </TableCell>
                                             <TableCell>
@@ -273,23 +277,19 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                                     color={user.role === 'admin' ? 'primary' : 'default'}
                                                 />
                                             </TableCell>
-                                            <TableCell>{formatDate(user.createdAt)}</TableCell>
+                                            <TableCell>
+                                                <Typography sx={{ fontSize: 12, color: 'var(--ink-3)', fontFamily: 'var(--font-mono)' }}>
+                                                    {formatDate(user.createdAt)}
+                                                </Typography>
+                                            </TableCell>
                                             <TableCell>{formatLicense(user.license)}</TableCell>
                                             <TableCell align="right">
                                                 {deleteTarget === user.username ? (
                                                     <Box sx={{ display: 'inline-flex', gap: 1 }}>
-                                                        <Button
-                                                            size="small"
-                                                            color="error"
-                                                            variant="contained"
-                                                            onClick={() => handleDelete(user.username)}
-                                                        >
+                                                        <Button size="small" color="error" variant="contained" onClick={() => handleDelete(user.username)}>
                                                             Confirm
                                                         </Button>
-                                                        <Button
-                                                            size="small"
-                                                            onClick={() => setDeleteTarget(null)}
-                                                        >
+                                                        <Button size="small" sx={{ color: 'var(--ink-3)' }} onClick={() => setDeleteTarget(null)}>
                                                             Cancel
                                                         </Button>
                                                     </Box>
@@ -304,12 +304,12 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                                                 setShowForm(false);
                                                             }}
                                                             title="Rename user"
+                                                            sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--ink)' } }}
                                                         >
-                                                            <EditIcon fontSize="small" />
+                                                            <EditIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                         <IconButton
                                                             size="small"
-                                                            color="primary"
                                                             onClick={() => {
                                                                 setLicenseTarget(user.username);
                                                                 setSelectedDays(30);
@@ -318,16 +318,17 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                                                 setRenameTarget(null);
                                                             }}
                                                             title="Set license"
+                                                            sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--accent)' } }}
                                                         >
-                                                            <CardMembershipIcon fontSize="small" />
+                                                            <CardMembershipIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                         <IconButton
                                                             size="small"
-                                                            color="error"
                                                             onClick={() => setDeleteTarget(user.username)}
                                                             title="Delete user"
+                                                            sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--danger)' } }}
                                                         >
-                                                            <DeleteIcon fontSize="small" />
+                                                            <DeleteIcon sx={{ fontSize: 16 }} />
                                                         </IconButton>
                                                     </Box>
                                                 )}
@@ -337,8 +338,8 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                     {users.length === 0 && (
                                         <TableRow>
                                             <TableCell colSpan={5} align="center">
-                                                <Typography color="text.secondary" sx={{ py: 2 }}>
-                                                    No users found. Seed from env vars or create a new user.
+                                                <Typography sx={{ fontSize: 13, color: 'var(--ink-3)', py: 2 }}>
+                                                    No users found.
                                                 </Typography>
                                             </TableCell>
                                         </TableRow>
@@ -347,72 +348,68 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                             </Table>
                         </TableContainer>
 
+                        {/* License panel */}
                         {licenseTarget && (
                             <Paper variant="outlined" sx={{ p: 2, mb: 2 }}>
-                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                    Set license for <strong>{licenseTarget}</strong>
+                                <Typography sx={overlineSx}>
+                                    License — {licenseTarget}
                                 </Typography>
-                                <TextField
-                                    size="small"
-                                    label="Start Date"
-                                    type="date"
-                                    fullWidth
-                                    value={licenseStartDate}
-                                    onChange={(e) => setLicenseStartDate(e.target.value)}
-                                    inputProps={{ max: todayISO }}
-                                    InputLabelProps={{ shrink: true }}
-                                    sx={{ mb: 1 }}
-                                />
-                                <TextField
-                                    size="small"
-                                    label="Duration"
-                                    select
-                                    fullWidth
-                                    value={selectedDays}
-                                    onChange={(e) => setSelectedDays(Number(e.target.value))}
-                                    sx={{ mb: 2 }}
-                                >
-                                    {LICENSE_PRESET_OPTIONS.map((opt) => (
-                                        <MenuItem key={opt.days} value={opt.days}>
-                                            {opt.label}
-                                        </MenuItem>
-                                    ))}
-                                </TextField>
-                                <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Button
-                                        variant="contained"
-                                        onClick={handleSetLicense}
-                                        disabled={settingLicense}
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mb: 2 }}>
+                                    <TextField
+                                        size="small"
+                                        label="Start Date"
+                                        type="date"
+                                        fullWidth
+                                        value={licenseStartDate}
+                                        onChange={(e) => setLicenseStartDate(e.target.value)}
+                                        inputProps={{ max: todayISO }}
+                                        InputLabelProps={{ shrink: true }}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Duration"
+                                        select
+                                        fullWidth
+                                        value={selectedDays}
+                                        onChange={(e) => setSelectedDays(Number(e.target.value))}
                                     >
-                                        {settingLicense ? 'Setting...' : 'Set License'}
+                                        {LICENSE_PRESET_OPTIONS.map((opt) => (
+                                            <MenuItem key={opt.days} value={opt.days}>{opt.label}</MenuItem>
+                                        ))}
+                                    </TextField>
+                                </Box>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <Button variant="contained" size="small" onClick={handleSetLicense} disabled={settingLicense}>
+                                        {settingLicense ? 'Saving…' : 'Set License'}
                                     </Button>
-                                    <Button onClick={() => setLicenseTarget(null)}>Cancel</Button>
+                                    <Button size="small" sx={{ color: 'var(--ink-3)' }} onClick={() => setLicenseTarget(null)}>
+                                        Cancel
+                                    </Button>
                                 </Box>
                             </Paper>
                         )}
 
+                        {/* New user form */}
                         {showForm ? (
                             <Paper variant="outlined" sx={{ p: 2 }}>
-                                <Typography variant="subtitle2" sx={{ mb: 1 }}>
-                                    New User
-                                </Typography>
-                                <TextField
-                                    size="small"
-                                    label="Username"
-                                    fullWidth
-                                    value={newUsername}
-                                    onChange={(e) => setNewUsername(e.target.value)}
-                                    sx={{ mb: 1 }}
-                                />
-                                <TextField
-                                    size="small"
-                                    label="Password"
-                                    type="password"
-                                    fullWidth
-                                    value={newPassword}
-                                    onChange={(e) => setNewPassword(e.target.value)}
-                                    sx={{ mb: 1 }}
-                                />
+                                <Typography sx={overlineSx}>New User</Typography>
+                                <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1, mb: 1 }}>
+                                    <TextField
+                                        size="small"
+                                        label="Username"
+                                        fullWidth
+                                        value={newUsername}
+                                        onChange={(e) => setNewUsername(e.target.value)}
+                                    />
+                                    <TextField
+                                        size="small"
+                                        label="Password"
+                                        type="password"
+                                        fullWidth
+                                        value={newPassword}
+                                        onChange={(e) => setNewPassword(e.target.value)}
+                                    />
+                                </Box>
                                 <TextField
                                     size="small"
                                     label="Role"
@@ -426,14 +423,10 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                     <MenuItem value="admin">Admin</MenuItem>
                                 </TextField>
                                 <Box sx={{ display: 'flex', gap: 1 }}>
-                                    <Button
-                                        variant="contained"
-                                        onClick={handleCreate}
-                                        disabled={creating || !newUsername || !newPassword}
-                                    >
-                                        {creating ? 'Creating...' : 'Create'}
+                                    <Button variant="contained" size="small" onClick={handleCreate} disabled={creating || !newUsername || !newPassword}>
+                                        {creating ? 'Creating…' : 'Create User'}
                                     </Button>
-                                    <Button onClick={() => setShowForm(false)}>
+                                    <Button size="small" sx={{ color: 'var(--ink-3)' }} onClick={() => setShowForm(false)}>
                                         Cancel
                                     </Button>
                                 </Box>
@@ -444,6 +437,7 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                                 variant="outlined"
                                 onClick={() => { setShowForm(true); setLicenseTarget(null); }}
                                 fullWidth
+                                size="small"
                             >
                                 Add User
                             </Button>
@@ -451,8 +445,9 @@ export default function UserManagementDialog({ open, onClose }: Props) {
                     </>
                 )}
             </DialogContent>
-            <DialogActions>
-                <Button onClick={onClose}>Close</Button>
+
+            <DialogActions sx={{ px: 3, pb: 2 }}>
+                <Button onClick={onClose} sx={{ color: 'var(--ink-3)' }}>Close</Button>
             </DialogActions>
         </Dialog>
     );
