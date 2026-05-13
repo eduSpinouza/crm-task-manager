@@ -12,6 +12,7 @@ import FollowUpDialog from './FollowUpDialog';
 import EmailDialog from './EmailDialog';
 import DebtorDetailDialog from './DebtorDetailDialog';
 import Snackbar from '@mui/material/Snackbar';
+import Tooltip from '@mui/material/Tooltip';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import KeyboardArrowDownIcon from '@mui/icons-material/KeyboardArrowDown';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
@@ -132,37 +133,16 @@ const DataRow = React.memo(function DataRow({ row, isSelected, onSelect, onViewD
                 <TableCell padding="checkbox">
                     <Checkbox checked={isSelected} />
                 </TableCell>
-                <TableCell
-                    sx={{
-                        width: 80,
-                        pr: '12px',
-                        '.view-label': {
-                            maxWidth: 0,
-                            overflow: 'hidden',
-                            opacity: 0,
-                            transition: 'max-width 150ms ease, opacity 150ms ease',
-                            whiteSpace: 'nowrap',
-                        },
-                        'tr:hover & .view-label': { maxWidth: 40, opacity: 1 },
-                    }}
-                >
-                    <Button
-                        size="small"
-                        startIcon={<OpenInNewIcon sx={{ fontSize: '13px !important' }} />}
-                        onClick={e => { e.stopPropagation(); onViewDetail(row); }}
-                        sx={{
-                            minWidth: 0,
-                            fontSize: 11,
-                            fontWeight: 500,
-                            color: 'var(--ink-3)',
-                            px: '8px',
-                            py: '4px',
-                            borderRadius: '4px',
-                            '&:hover': { color: 'var(--accent)', bgcolor: 'var(--accent-soft)' },
-                        }}
-                    >
-                        <span className="view-label">View</span>
-                    </Button>
+                <TableCell sx={{ width: 40, px: 1, textAlign: 'center' }}>
+                    <Tooltip title="View details" placement="right">
+                        <IconButton
+                            size="small"
+                            onClick={e => { e.stopPropagation(); onViewDetail(row); }}
+                            sx={{ color: 'var(--ink-3)', '&:hover': { color: 'var(--accent)', bgcolor: 'var(--accent-soft)' } }}
+                        >
+                            <OpenInNewIcon sx={{ fontSize: 17 }} />
+                        </IconButton>
+                    </Tooltip>
                 </TableCell>
                 {rowCells(row)}
             </TableRow>
@@ -755,7 +735,7 @@ export default function UserListTable() {
                                                 onChange={handleSelectAll}
                                             />
                                         </TableCell>
-                                        <TableCell sx={{ py: '6px', width: 80, fontSize: 11, fontWeight: 500, color: 'var(--ink-2)' }}>Details</TableCell>
+                                        <TableCell sx={{ py: '6px', width: 40, fontSize: 11, fontWeight: 500, color: 'var(--ink-2)' }}>Details</TableCell>
                                         <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>Name</TableCell>
                                         <TableCell sx={{ py: '6px', fontSize: 11, fontWeight: 500, color: 'var(--ink-2)', whiteSpace: 'nowrap' }}>
                                             Email
